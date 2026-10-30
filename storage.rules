@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isChatParticipant(chatId) {
+      return firestore.get(/databases/(default)/documents/chats/$(chatId)).data.participants
+             .hasAny([request.auth.uid]);
+    }
+
+    // Chat attachments: images, short videos and voice notes.
+    match /chat-media/{chatId}/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+                   && request.auth.uid == userId
+                   && isChatParticipant(chatId)
+                   && request.resource.size < 50 * 1024 * 1024;
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Profile avatars.
+    match /avatars/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024;
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

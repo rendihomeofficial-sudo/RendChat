@@ -1,0 +1,1138 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../models/chat_model.dart';
+import '../models/user_model.dart';
+import '../services/app_update_service.dart';
+import '../services/chat_service.dart';
+import '../services/lock_chat_passcode_manager.dart';
+import '../theme/whatsapp_theme.dart';
+import '../widgets/user_avatar.dart';
+import 'chat_screen.dart';
+import 'contacts_screen.dart';
+import 'new_group_screen.dart';
+import 'profile_screen.dart';
+import 'starred_messages_screen.dart';
+import 'call_screen.dart';
+import 'status_viewer_screen.dart';
+import 'text_status_composer_screen.dart';
+import 'archived_chats_screen.dart';
+import 'locked_chats_screen.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _currentTabIndex = 0;
+  String _selectedFilter = 'All';
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+
+  final List<String> _filters = ['All', 'Unread', 'Favorites', 'Groups'];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppUpdateService.checkUpdateOnStartup(context);
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthService>();
+    final currentUser = auth.appUser;
+
+    if (currentUser == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      appBar: _buildAppBar(context, currentUser),
+      body: IndexedStack(
+        index: _currentTabIndex,
+        children: [
+          _buildChatsTab(context, currentUser),
+          _buildUpdatesTab(context, currentUser),
+          _buildCommunitiesTab(context),
+          _buildCallsTab(context),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+              width: 0.5,
+            ),
+          ),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentTabIndex,
+          onTap: (index) => setState(() => _currentTabIndex = index),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.chat_bubble_outline_rounded),
+              activeIcon: Icon(Icons.chat_bubble_rounded),
+              label: 'Chats',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.update_rounded),
+              activeIcon: Icon(Icons.update_rounded),
+              label: 'Updates',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.groups_outlined),
+              activeIcon: Icon(Icons.groups_rounded),
+              label: 'Communities',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.call_outlined),
+              activeIcon: Icon(Icons.call_rounded),
+              label: 'Calls',
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: _buildFab(context),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(BuildContext context, AppUser currentUser) {
+    if (_isSearching) {
+      return AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            setState(() {
+              _isSearching = false;
+              _searchController.clear();
+            });
+          },
+        ),
+        title: TextField(
+          controller: _searchController,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white, fontSize: 17),
+          decoration: const InputDecoration(
+            hintText: 'Search or enter secret code...',
+            hintStyle: TextStyle(color: WhatsAppTheme.darkTextSecondary),
+            border: InputBorder.none,
+          ),
+          onChanged: (val) {
+            setState(() {});
+          },
+        ),
+        actions: [
+          if (_searchController.text.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () {
+                setState(() {
+                  _searchController.clear();
+                });
+              },
+            ),
+        ],
+      );
+    }
+
+    final titles = ['RenChat', 'Updates', 'Communities', 'Calls'];
+    return AppBar(
+      title: Text(
+        titles[_currentTabIndex],
+        style: TextStyle(
+          color: _currentTabIndex == 0 ? WhatsAppTheme.primaryTeal : null,
+          fontWeight: FontWeight.bold,
+          fontSize: 22,
+          letterSpacing: -0.3,
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.camera_alt_outlined),
+          tooltip: 'Camera',
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('RenChat Camera opened')),
+            );
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.search_rounded),
+          tooltip: 'Search',
+          onPressed: () {
+            setState(() {
+              _isSearching = true;
+            });
+          },
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert_rounded),
+          onSelected: (value) {
+            if (value == 'new_group') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NewGroupScreen()),
+              );
+            } else if (value == 'new_broadcast') {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('New broadcast list created')),
+              );
+            } else if (value == 'linked_devices') {
+              _showLinkedDevicesDialog(context);
+            } else if (value == 'starred') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const StarredMessagesScreen()),
+              );
+            } else if (value == 'profile' || value == 'settings') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'new_group',
+              child: Text('New group'),
+            ),
+            const PopupMenuItem(
+              value: 'new_broadcast',
+              child: Text('New broadcast'),
+            ),
+            const PopupMenuItem(
+              value: 'linked_devices',
+              child: Text('Linked devices'),
+            ),
+            const PopupMenuItem(
+              value: 'starred',
+              child: Text('Starred messages'),
+            ),
+            const PopupMenuItem(
+              value: 'settings',
+              child: Text('Settings'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget? _buildFab(BuildContext context) {
+    switch (_currentTabIndex) {
+      case 0: // Chats
+        return FloatingActionButton(
+          tooltip: 'New Chat',
+          child: const Icon(Icons.message_rounded),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ContactsScreen()),
+            );
+          },
+        );
+      case 1: // Updates/Status
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 40,
+              width: 40,
+              child: FloatingActionButton.small(
+                backgroundColor: WhatsAppTheme.darkPill,
+                foregroundColor: Colors.white,
+                child: const Icon(Icons.edit_rounded, size: 20),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TextStatusComposerScreen()),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            FloatingActionButton(
+              tooltip: 'Add Status',
+              child: const Icon(Icons.camera_alt_rounded),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const StatusViewerScreen(
+                      userName: 'My Status',
+                      statusText: '🚀 Hello RenChat! Enjoying the new messenger.',
+                      backgroundColor: Color(0xFF005C4B),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      case 3: // Calls
+        return FloatingActionButton(
+          tooltip: 'New Call',
+          child: const Icon(Icons.add_call),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ContactsScreen()),
+            );
+          },
+        );
+      default:
+        return null;
+    }
+  }
+
+  // 1. CHATS TAB
+  Widget _buildChatsTab(BuildContext context, AppUser currentUser) {
+    final chatService = context.read<ChatService>();
+    return Column(
+      children: [
+        // Filter Pills Row (WhatsApp Modern: All, Unread, Favorites, Groups)
+        Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _filters.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, idx) {
+              final f = _filters[idx];
+              final isSelected = _selectedFilter == f;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedFilter = f),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? WhatsAppTheme.primaryTeal.withValues(alpha: 0.2)
+                        : WhatsAppTheme.darkPill,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: isSelected ? WhatsAppTheme.primaryTeal : Colors.transparent,
+                      width: 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      f,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        color: isSelected ? WhatsAppTheme.primaryTeal : WhatsAppTheme.darkTextSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        // WhatsApp Locked Chats Folder (Secret PIN/Biometric Chats)
+        ValueListenableBuilder<bool>(
+          valueListenable: LockChatPasscodeManager().hideLockedChatsNotifier,
+          builder: (context, isHidden, _) {
+            final query = _searchController.text.trim();
+            final secretPasscode = LockChatPasscodeManager().currentPasscode;
+            final isSecretCodeEntered = query == secretPasscode;
+
+            return StreamBuilder<List<Chat>>(
+              stream: chatService.streamUserChats(currentUser.uid),
+              builder: (context, snap) {
+                final allChats = snap.data ?? [];
+                final lockedCount = allChats.where((c) => c.isLockedBy(currentUser.uid)).length;
+                final archivedCount = allChats.where((c) => c.isArchivedBy(currentUser.uid)).length;
+
+                // If hidden, only show when secret code is typed into search bar
+                final shouldShowLocked = lockedCount > 0 && (!isHidden || isSecretCodeEntered);
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (shouldShowLocked)
+                      ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.lock_rounded, size: 20, color: WhatsAppTheme.primaryTeal),
+                        title: Row(
+                          children: [
+                            const Text('Locked chats', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                            if (isHidden && isSecretCodeEntered) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'Secret Code Match',
+                                  style: TextStyle(color: WhatsAppTheme.primaryTeal, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        trailing: Text(
+                          '$lockedCount',
+                          style: const TextStyle(color: WhatsAppTheme.primaryTeal, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const LockedChatsScreen()),
+                          );
+                        },
+                      ),
+                    // WhatsApp Archived Chats Folder
+                    if (!_isSearching)
+                      ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.archive_outlined, size: 20, color: WhatsAppTheme.darkTextSecondary),
+                        title: const Text('Archived', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        trailing: Text(
+                          '$archivedCount',
+                          style: TextStyle(
+                            color: archivedCount > 0 ? WhatsAppTheme.primaryTeal : WhatsAppTheme.darkTextSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ArchivedChatsScreen()),
+                          );
+                        },
+                      ),
+                    const Divider(height: 1),
+                  ],
+                );
+              },
+            );
+          },
+        ),
+        // Chat List Stream
+        Expanded(
+          child: StreamBuilder<List<Chat>>(
+            stream: chatService.streamUserChats(currentUser.uid),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              var chats = snapshot.data ?? [];
+
+              // Exclude archived and locked chats from the main chat list (matching WhatsApp APK)
+              chats = chats.where((c) => !c.isArchivedBy(currentUser.uid) && !c.isLockedBy(currentUser.uid)).toList();
+
+              // Sort pinned chats to the top, then by lastMessageAt desc
+              chats.sort((a, b) {
+                final aPinned = a.isPinnedBy(currentUser.uid);
+                final bPinned = b.isPinnedBy(currentUser.uid);
+                if (aPinned && !bPinned) return -1;
+                if (!aPinned && bPinned) return 1;
+                final aDate = a.lastMessageAt ?? a.createdAt;
+                final bDate = b.lastMessageAt ?? b.createdAt;
+                return bDate.compareTo(aDate);
+              });
+
+              // Filter logic
+              if (_selectedFilter == 'Unread') {
+                chats = chats.where((c) => (c.unread[currentUser.uid] ?? 0) > 0).toList();
+              } else if (_selectedFilter == 'Groups') {
+                chats = chats.where((c) => c.isGroup).toList();
+              }
+
+              // Search query filter
+              final q = _searchController.text.trim().toLowerCase();
+              if (q.isNotEmpty && q != LockChatPasscodeManager().currentPasscode) {
+                chats = chats.where((c) {
+                  final title = c.getDisplayTitle(currentUser.uid).toLowerCase();
+                  final last = (c.lastMessage ?? '').toLowerCase();
+                  return title.contains(q) || last.contains(q);
+                }).toList();
+              }
+
+              if (chats.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 72,
+                          color: WhatsAppTheme.darkTextSecondary,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No chats yet',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Tap the green button below to start messaging friends on RenChat.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: WhatsAppTheme.darkTextSecondary),
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: WhatsAppTheme.primaryTeal,
+                          ),
+                          icon: const Icon(Icons.chat_rounded),
+                          label: const Text('Start Chat'),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const ContactsScreen()),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                itemCount: chats.length,
+                separatorBuilder: (_, __) => const Divider(
+                  height: 1,
+                  indent: 74,
+                  endIndent: 16,
+                  color: Color(0xFF1E282E),
+                ),
+                itemBuilder: (context, index) {
+                  final chat = chats[index];
+                  return _WhatsAppChatTile(chat: chat, currentUserId: currentUser.uid);
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 2. UPDATES / STATUS TAB
+  Widget _buildUpdatesTab(BuildContext context, AppUser currentUser) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(
+            'Status',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+        ListTile(
+          leading: Stack(
+            children: [
+              UserAvatar(
+                name: currentUser.displayName,
+                photoUrl: currentUser.photoURL,
+                radius: 26,
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: WhatsAppTheme.primaryTeal,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.add, size: 16, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          title: const Text('My status', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('Tap to add status update', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TextStatusComposerScreen()),
+            );
+          },
+        ),
+        const Divider(height: 24),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(
+            'Recent updates',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: WhatsAppTheme.darkTextSecondary,
+            ),
+          ),
+        ),
+        ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(2.5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: WhatsAppTheme.primaryTeal, width: 2.2),
+            ),
+            child: const CircleAvatar(
+              radius: 22,
+              backgroundColor: Color(0xFF233138),
+              child: Text('BB', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+          title: const Text('Bob Builder', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('Today, 8:42 PM', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const StatusViewerScreen(
+                  userName: 'Bob Builder',
+                  statusText: '🛠️ Working on the new RenChat features! Check out the updates.',
+                  backgroundColor: Color(0xFF1E3A8A),
+                ),
+              ),
+            );
+          },
+        ),
+        const Divider(height: 24),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Channels',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                'Explore >',
+                style: TextStyle(color: WhatsAppTheme.primaryTeal, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+        ListTile(
+          leading: const CircleAvatar(
+            backgroundColor: Color(0xFF008069),
+            child: Icon(Icons.campaign_rounded, color: Colors.white),
+          ),
+          title: const Text('RenChat Official', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('Welcome to RenChat Channels! Get updates on new features.'),
+          trailing: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: WhatsAppTheme.primaryTeal,
+              side: const BorderSide(color: WhatsAppTheme.primaryTeal),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('You are now following RenChat Channel!')),
+              );
+            },
+            child: const Text('Follow'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 3. COMMUNITIES TAB
+  Widget _buildCommunitiesTab(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: WhatsAppTheme.darkPill,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.groups_rounded,
+                size: 80,
+                color: WhatsAppTheme.primaryTeal,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Stay connected with a community',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Communities bring members together in topic-based groups, and make it easy to get admin announcements.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 14),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: WhatsAppTheme.primaryTeal,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('Start your community'),
+              onPressed: () {
+                _showNewCommunityDialog(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 4. CALLS TAB
+  Widget _buildCallsTab(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        ListTile(
+          leading: const CircleAvatar(
+            backgroundColor: WhatsAppTheme.primaryTeal,
+            child: Icon(Icons.link_rounded, color: Colors.white),
+          ),
+          title: const Text('Create call link', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('Share a link for your RenChat call', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+          onTap: () {
+            _showCallLinkDialog(context);
+          },
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Text(
+            'Recent',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: WhatsAppTheme.darkTextSecondary),
+          ),
+        ),
+        ListTile(
+          leading: const CircleAvatar(
+            backgroundColor: Color(0xFF233138),
+            child: Text('BB', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          title: const Text('Bob Builder', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Row(
+            children: [
+              Icon(Icons.call_received_rounded, size: 16, color: Colors.green),
+              SizedBox(width: 4),
+              Text('Yesterday, 9:15 PM', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+            ],
+          ),
+          trailing: IconButton(
+            icon: const Icon(Icons.call_outlined, color: WhatsAppTheme.primaryTeal),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CallScreen(
+                    callerName: 'Bob Builder',
+                    isVideo: false,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showLinkedDevicesDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.devices_rounded, color: WhatsAppTheme.primaryTeal),
+            SizedBox(width: 8),
+            Text('Linked Devices'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Center(
+              child: Icon(Icons.laptop_mac_rounded, size: 64, color: WhatsAppTheme.primaryTeal),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Use RenChat on Web, Desktop, and other devices without keeping your phone online.',
+              style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: const Text('Link a device'),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Point your phone camera to scan RenChat Web QR Code')),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCallLinkDialog(BuildContext context) {
+    final link = 'https://call.whatsapp.com/v1/${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.link_rounded, color: WhatsAppTheme.primaryTeal),
+            SizedBox(width: 8),
+            Text('RenChat Call Link'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Anyone with RenChat can use this link to join this call. Only share it with people you trust.',
+              style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: WhatsAppTheme.darkSurface,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: SelectableText(
+                link,
+                style: const TextStyle(color: WhatsAppTheme.primaryTeal, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            label: const Text('Copy link'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Call link copied to clipboard!')),
+              );
+            },
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNewCommunityDialog(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.groups_rounded, color: WhatsAppTheme.primaryTeal),
+            SizedBox(width: 8),
+            Text('New Community'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Bring members together in topic-based groups, and easily send admin announcements.',
+              style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Community Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+            onPressed: () {
+              final name = nameCtrl.text.trim();
+              Navigator.pop(ctx);
+              if (name.isNotEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Community "$name" successfully created!')),
+                );
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WhatsAppChatTile extends StatelessWidget {
+  final Chat chat;
+  final String currentUserId;
+
+  const _WhatsAppChatTile({required this.chat, required this.currentUserId});
+
+  @override
+  Widget build(BuildContext context) {
+    final title = chat.getDisplayTitle(currentUserId);
+    final avatar = chat.getDisplayAvatar(currentUserId);
+    final unreadCount = chat.unread[currentUserId] ?? 0;
+    final otherUid = chat.getOtherUserId(currentUserId);
+    final chatService = context.read<ChatService>();
+
+    String timeStr = '';
+    if (chat.lastMessageAt != null) {
+      final now = DateTime.now();
+      final msgDate = chat.lastMessageAt!;
+      if (now.difference(msgDate).inDays == 0) {
+        timeStr = DateFormat.jm().format(msgDate);
+      } else if (now.difference(msgDate).inDays == 1) {
+        timeStr = 'Yesterday';
+      } else {
+        timeStr = DateFormat('dd/MM/yy').format(msgDate);
+      }
+    }
+
+    final isPinned = chat.isPinnedBy(currentUserId);
+
+    void showChatActions(BuildContext context) {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: WhatsAppTheme.darkSurface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: Icon(
+                  isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                  color: isPinned ? WhatsAppTheme.primaryTeal : null,
+                ),
+                title: Text(isPinned ? 'Unpin chat' : 'Pin chat'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    final pinned = await chatService.togglePinChat(
+                      chatId: chat.id,
+                      userId: currentUserId,
+                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(pinned ? 'Chat pinned' : 'Chat unpinned')),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+                      );
+                    }
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.archive_outlined),
+                title: const Text('Archive chat'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await chatService.toggleArchiveChat(
+                    chatId: chat.id,
+                    userId: currentUserId,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Chat archived')),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.lock_outline_rounded),
+                title: const Text('Lock chat'),
+                subtitle: const Text('Hide and lock this chat with passcode'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await chatService.toggleLockChat(
+                    chatId: chat.id,
+                    userId: currentUserId,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Chat moved to Locked Chats')),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.mark_chat_unread_outlined),
+                title: const Text('Mark as unread'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Marked as unread')),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      onLongPress: () => showChatActions(context),
+      leading: chat.isGroup
+          ? const CircleAvatar(
+              radius: 26,
+              backgroundColor: Color(0xFF233138),
+              child: Icon(Icons.group_rounded, color: Colors.white70, size: 28),
+            )
+          : otherUid != null
+              ? StreamBuilder<AppUser?>(
+                  stream: chatService.streamUserProfile(otherUid),
+                  builder: (context, snap) {
+                    return UserAvatar(
+                      name: title,
+                      photoUrl: snap.data?.photoURL ?? avatar,
+                      radius: 26,
+                      showOnlineBadge: true,
+                      isOnline: snap.data?.online ?? false,
+                    );
+                  },
+                )
+              : UserAvatar(
+                  name: title,
+                  photoUrl: avatar,
+                  radius: 26,
+                ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          if (isPinned)
+            const Padding(
+              padding: EdgeInsets.only(left: 6, right: 4),
+              child: Icon(Icons.push_pin_rounded, size: 16, color: WhatsAppTheme.darkTextSecondary),
+            ),
+          if (timeStr.isNotEmpty)
+            Text(
+              timeStr,
+              style: TextStyle(
+                fontSize: 12,
+                color: unreadCount > 0 ? WhatsAppTheme.primaryTeal : WhatsAppTheme.darkTextSecondary,
+                fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+        ],
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 4.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                chat.lastMessage ?? 'Say hello!',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: unreadCount > 0 ? WhatsAppTheme.darkTextPrimary : WhatsAppTheme.darkTextSecondary,
+                  fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
+                ),
+              ),
+            ),
+            if (unreadCount > 0)
+              Container(
+                margin: const EdgeInsets.only(left: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: const BoxDecoration(
+                  color: WhatsAppTheme.primaryTeal,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '$unreadCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ChatScreen(chat: chat)),
+        );
+      },
+    );
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "version_code": 1,
+  "title": "RenChat Pembaruan Resmi",
+  "release_notes": "• Fitur baru: Block & Unblock kontak secara penuh\n• Layanan Kunci Obrolan (Locked Chats) dengan PIN rahasia\n• Peningkatan antarmuka & stabilitas perpesanan realtime\n• Dukungan pendaftaran akun Google resmi",
+  "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
+  "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
+}
