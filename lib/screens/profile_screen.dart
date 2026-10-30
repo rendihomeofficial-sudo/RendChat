@@ -1243,7 +1243,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               subtitle: const Text('Periksa versi terbaru dari GitHub', style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
               onTap: () {
                 Navigator.pop(ctx);
-                AppUpdateService.checkUpdate(context, silentIfUpToDate: false);
+                showUpdateDialog(context);
               },
             ),
             ListTile(

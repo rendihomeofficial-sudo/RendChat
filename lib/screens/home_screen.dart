@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/chat_model.dart';
 import '../models/user_model.dart';
 import '../services/app_update_service.dart';
+import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../services/lock_chat_passcode_manager.dart';
 import '../theme/whatsapp_theme.dart';
@@ -38,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      AppUpdateService.checkUpdateOnStartup(context);
+      AppUpdateService.instance.checkUpdateOnStartup();
     });
   }
 
@@ -61,13 +62,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: _buildAppBar(context, currentUser),
-      body: IndexedStack(
-        index: _currentTabIndex,
+      body: Column(
         children: [
-          _buildChatsTab(context, currentUser),
-          _buildUpdatesTab(context, currentUser),
-          _buildCommunitiesTab(context),
-          _buildCallsTab(context),
+          // Banner popup otomatis saat versi baru tersedia di GitHub.
+          const UpdateBanner(),
+          Expanded(
+            child: IndexedStack(
+              index: _currentTabIndex,
+              children: [
+                _buildChatsTab(context, currentUser),
+                _buildUpdatesTab(context, currentUser),
+                _buildCommunitiesTab(context),
+                _buildCallsTab(context),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: Container(

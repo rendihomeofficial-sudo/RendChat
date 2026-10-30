@@ -5,9 +5,11 @@ admin.initializeApp();
 
 /**
  * Triggers when a new message is posted in any chat.
- * Updates chat metadata (lastMessage, lastMessageAt, unread counters)
- * and sends an FCM push notification to all recipients who are offline
- * or have an FCM token registered.
+ * Sends FCM push notification to all recipients who are offline or have FCM tokens.
+ *
+ * NOTE: Chat metadata & unread counters are already maintained atomically by
+ * the Flutter client (ChatService) in Firestore. To prevent double-counting,
+ * this function only dispatches FCM notifications.
  */
 exports.onMessageCreated = onDocumentCreated(
   "chats/{chatId}/messages/{messageId}",
@@ -21,42 +23,6 @@ exports.onMessageCreated = onDocumentCreated(
 
     const db = admin.firestore();
     const chatRef = db.collection("chats").doc(chatId);
-
-    try {
-      await db.runTransaction(async (tx) => {
-        const chatDoc = await tx.get(chatRef);
-        if (!chatDoc.exists) return;
-        const chatData = chatDoc.data() || {};
-        const participants = chatData.participants || [];
-
-        const unread = { ...(chatData.unread || {}) };
-        for (const uid of participants) {
-          if (uid !== senderId) {
-            unread[uid] = (unread[uid] || 0) + 1;
-          }
-        }
-
-        const previewText = message.deleted
-          ? "Message deleted"
-          : message.type === "image"
-          ? "📷 Photo"
-          : message.type === "voice"
-          ? "🎤 Voice message"
-          : message.type === "file"
-          ? "📎 File"
-          : message.text || "";
-
-        tx.update(chatRef, {
-          lastMessage: previewText,
-          lastMessageAt: message.createdAt || admin.firestore.FieldValue.serverTimestamp(),
-          lastSenderId: senderId,
-          unread,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      });
-    } catch (err) {
-      console.error(`Failed to update chat metadata for ${chatId}:`, err);
-    }
 
     // Send FCM push notifications
     try {
@@ -92,11 +58,13 @@ exports.onMessageCreated = onDocumentCreated(
         : senderName;
 
       const body = message.type === "image"
-        ? "Sent a photo"
+        ? (message.isViewOnce ? "👁️ Photo (View Once)" : "📷 Sent a photo")
         : message.type === "voice"
-        ? "Sent a voice message"
+        ? "🎤 Sent a voice message"
         : message.type === "file"
-        ? "Sent an attachment"
+        ? "📎 Sent an attachment"
+        : message.type === "poll"
+        ? `📊 Poll: ${message.pollQuestion || "New poll"}`
         : message.text || "New message";
 
       const payload = {

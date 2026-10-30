@@ -12,7 +12,16 @@ service firebase.storage {
              .hasAny([request.auth.uid]);
     }
 
-    // Chat attachments: images, short videos and voice notes.
+    // Chat attachments (used by StorageService: chats/{chatId}/{fileName})
+    match /chats/{chatId}/{fileName} {
+      allow read: if isSignedIn() && isChatParticipant(chatId);
+      allow write: if isSignedIn()
+                   && isChatParticipant(chatId)
+                   && request.resource.size < 50 * 1024 * 1024;
+      allow delete: if isSignedIn() && isChatParticipant(chatId);
+    }
+
+    // Chat attachments legacy path (chat-media/{chatId}/{userId}/{fileName})
     match /chat-media/{chatId}/{userId}/{fileName} {
       allow read: if isSignedIn();
       allow write: if isSignedIn()
@@ -22,12 +31,21 @@ service firebase.storage {
       allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Profile avatars.
+    // Profile avatars (used by StorageService: users/{userId}/avatar.jpg)
+    match /users/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+                   && request.auth.uid == userId
+                   && request.resource.size < 10 * 1024 * 1024;
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Profile avatars legacy path (avatars/{userId}/{fileName})
     match /avatars/{userId}/{fileName} {
       allow read: if isSignedIn();
       allow write: if isSignedIn()
                    && request.auth.uid == userId
-                   && request.resource.size < 5 * 1024 * 1024;
+                   && request.resource.size < 10 * 1024 * 1024;
       allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 

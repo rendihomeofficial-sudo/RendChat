@@ -4,29 +4,44 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 
+/// Service autentikasi RenChat.
+///
+/// Seluruh alur masuk/daftar memakai akun Google. Form email/password
+/// sudah dihapus sepenuhnya agar tidak ada akun lama yang tersisa.
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  GoogleSignIn? _googleSignIn;
 
-  GoogleSignIn get _googleSignInInstance {
-    _googleSignIn ??= GoogleSignIn(
-      clientId: kIsWeb ? '1062003220328-evnrsoocba1h9gm98eccgrv89gagv9b2.apps.googleusercontent.com' : null,
-      serverClientId: '1062003220328-evnrsoocba1h9gm98eccgrv89gagv9b2.apps.googleusercontent.com',
-      scopes: [
-        'email',
-        'https://www.googleapis.com/auth/userinfo.profile',
-      ],
-    );
-    return _googleSignIn!;
-  }
+  /// Client ID Web (OAuth 2.0) dari project Firebase.
+  static const String _webClientId =
+      '1062003220328-evnrsoocba1h9gm98eccgrv89gagv9b2.apps.googleusercontent.com';
+
+  /// Server client ID (Web application type) dipakai untuk bertukar idToken
+  /// menjadi kredensial Firebase di platform Android/iOS.
+  static const String _serverClientId =
+      '1062003220328-evnrsoocba1h9gm98eccgrv89gagv9b2.apps.googleusercontent.com';
 
   User? _firebaseUser;
   AppUser? _appUser;
   bool _isLoading = true;
+  bool _googleReady = false;
 
   AuthService() {
+    _initGoogle();
     _auth.authStateChanges().listen(_onAuthStateChanged);
+  }
+
+  Future<void> _initGoogle() async {
+    try {
+      await GoogleSignIn.instance.initialize(
+        clientId: kIsWeb ? _webClientId : null,
+        serverClientId: kIsWeb ? null : _serverClientId,
+      );
+      _googleReady = true;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Gagal menginisialisasi Google Sign-In: $e');
+    }
   }
 
   User? get firebaseUser => _firebaseUser;
@@ -56,107 +71,87 @@ class AuthService extends ChangeNotifier {
           toFirestore: (u, _) => u.toFirestore(),
         );
 
-    final snap = await userRef.get();
-    if (!snap.exists) {
-      final newUser = AppUser(
-        uid: user.uid,
-        email: user.email ?? '',
-        displayName: user.displayName ?? (user.email?.split('@').first ?? 'User'),
-        photoURL: user.photoURL,
-        statusMessage: 'Hey there! I am using Messenger.',
-        online: true,
-        lastSeen: DateTime.now(),
-        fcmTokens: const [],
-        createdAt: DateTime.now(),
-      );
-      await userRef.set(newUser);
-    } else {
-      await userRef.update({
-        'online': true,
-        'lastSeen': Timestamp.now(),
-      });
+    try {
+      final snap = await userRef.get();
+      if (!snap.exists) {
+        final newUser = AppUser(
+          uid: user.uid,
+          email: user.email ?? '',
+          displayName: user.displayName ?? (user.email?.split('@').first ?? 'User'),
+          photoURL: user.photoURL,
+          statusMessage: 'Hey there! I am using Messenger.',
+          online: true,
+          lastSeen: DateTime.now(),
+          fcmTokens: const [],
+          createdAt: DateTime.now(),
+        );
+        await userRef.set(newUser);
+      } else {
+        await userRef.update({
+          'online': true,
+          'lastSeen': Timestamp.now(),
+        });
+      }
+    } catch (e) {
+      debugPrint('Gagal sinkronkan profil ke Firestore: $e');
     }
   }
 
   Future<void> _fetchAppUser(String uid) async {
-    final snap = await _firestore
-        .collection('users')
-        .doc(uid)
-        .withConverter<AppUser>(
-          fromFirestore: AppUser.fromFirestore,
-          toFirestore: (u, _) => u.toFirestore(),
-        )
-        .get();
-
-    if (snap.exists) {
-      _appUser = snap.data();
-      notifyListeners();
-    }
-  }
-
-  Future<UserCredential> signInWithEmailPassword(String email, String password) async {
-    _isLoading = true;
-    notifyListeners();
     try {
-      final cred = await _auth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
-      return cred;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
+      final snap = await _firestore
+          .collection('users')
+          .doc(uid)
+          .withConverter<AppUser>(
+            fromFirestore: AppUser.fromFirestore,
+            toFirestore: (u, _) => u.toFirestore(),
+          )
+          .get();
 
-  Future<UserCredential> registerWithEmailPassword(
-    String email,
-    String password,
-    String displayName,
-  ) async {
-    _isLoading = true;
-    notifyListeners();
-    try {
-      final cred = await _auth.createUserWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
-      if (cred.user != null) {
-        await cred.user!.updateDisplayName(displayName.trim());
-        await _syncUserToFirestore(cred.user!);
+      if (snap.exists) {
+        _appUser = snap.data();
+        notifyListeners();
       }
-      return cred;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+    } catch (e) {
+      debugPrint('Gagal memuat profil pengguna: $e');
     }
   }
 
+  /// Masuk / daftar dengan akun Google.
+  ///
+  /// Mengembalikan `null` bila pengguna membatalkan dialog.
   Future<UserCredential?> signInWithGoogle() async {
     _isLoading = true;
     notifyListeners();
     try {
       if (kIsWeb) {
-        GoogleAuthProvider googleProvider = GoogleAuthProvider();
-        googleProvider.addScope('email');
-        googleProvider.addScope('profile');
+        final googleProvider = GoogleAuthProvider()
+          ..addScope('email')
+          ..addScope('profile');
         return await _auth.signInWithPopup(googleProvider);
-      } else {
-        final GoogleSignInAccount? googleUser = await _googleSignInInstance.signIn();
-        if (googleUser == null) {
-          return null; // user cancelled
-        }
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-        final OAuthCredential credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-        final userCredential = await _auth.signInWithCredential(credential);
-        if (userCredential.user != null) {
-          await _syncUserToFirestore(userCredential.user!);
-        }
-        return userCredential;
       }
+
+      if (!_googleReady) {
+        // Beri kesempatan inisialisasi selesai sebelum dipakai.
+        await _initGoogle();
+      }
+
+      final GoogleSignInAccount googleUser =
+          await GoogleSignIn.instance.authenticate();
+
+      final GoogleSignInAuthentication auth = googleUser.authentication;
+      final String? idToken = auth.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Gagal memperoleh token Google. Silakan coba lagi.');
+      }
+
+      final credential = GoogleAuthProvider.credential(idToken: idToken);
+      final userCredential = await _auth.signInWithCredential(credential);
+
+      if (userCredential.user != null) {
+        await _syncUserToFirestore(userCredential.user!);
+      }
+      return userCredential;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -170,10 +165,14 @@ class AuthService extends ChangeNotifier {
           'online': false,
           'lastSeen': Timestamp.now(),
         });
-      } catch (_) {}
+      } catch (_) {
+        // Abaikan: dokumen mungkin sudah tidak ada / rules menolak.
+      }
     }
     if (!kIsWeb) {
-      await _googleSignInInstance.signOut();
+      try {
+        await GoogleSignIn.instance.signOut();
+      } catch (_) {}
     }
     await _auth.signOut();
     _firebaseUser = null;
@@ -181,7 +180,11 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateProfile({String? displayName, String? statusMessage, String? photoURL}) async {
+  Future<void> updateProfile({
+    String? displayName,
+    String? statusMessage,
+    String? photoURL,
+  }) async {
     if (_firebaseUser == null) return;
     final Map<String, dynamic> updates = {};
     if (displayName != null) {

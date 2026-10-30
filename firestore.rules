@@ -19,7 +19,7 @@ service cloud.firestore {
       allow create: if isSelf(uid);
       allow update: if isSelf(uid)
                     && request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['displayName', 'photoURL', 'online', 'lastSeen', 'fcmTokens', 'statusMessage']);
+                         .hasOnly(['displayName', 'photoURL', 'online', 'lastSeen', 'fcmTokens', 'statusMessage', 'blockedUsers']);
       allow delete: if false;
 
       match /devices/{deviceId} {
@@ -63,7 +63,7 @@ service cloud.firestore {
                       && (
                         (resource.data.senderId == request.auth.uid
                          && request.resource.data.diff(resource.data).affectedKeys()
-                              .hasOnly(['text', 'editedAt', 'deleted', 'deletedAt']))
+                              .hasOnly(['text', 'editedAt', 'deleted', 'deletedAt', 'mediaUrl']))
                         ||
                         (request.resource.data.diff(resource.data).affectedKeys()
                               .hasOnly(['reactions', 'readBy', 'deliveryStatus', 'starredBy', 'pollVotes', 'viewedBy']))

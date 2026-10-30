@@ -1,8 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- WAJIB: aplikasi release butuh internet untuk Firebase Auth,
+         Firestore realtime, push notification, dan pengecekan pembaruan.
+         Tanpa permission ini build release tidak bisa mengakses jaringan sama sekali. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+    <!-- Notifikasi push (Android 13+ memerlukan izin runtime) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- Izin instalar APK pembaruan langsung dari aplikasi -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
     <application
         android:label="RenChat"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -40,6 +53,21 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Diperlukan agar canLaunchUrl/launchUrl dapat membuka browser
+             untuk mengunduh APK pembaruan di Android 11+. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="http"/>
+        </intent>
+        <!-- Google Sign-In (Credential Manager) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
         </intent>
     </queries>
 </manifest>

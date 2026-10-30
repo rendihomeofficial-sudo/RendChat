@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
+import 'services/app_update_service.dart';
 import 'services/auth_service.dart';
 import 'services/chat_service.dart';
 import 'services/notification_service.dart';
@@ -28,6 +29,9 @@ class MessengerApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider<AppUpdateService>.value(
+          value: AppUpdateService.instance,
+        ),
         Provider(create: (_) => ChatService()),
         Provider(create: (_) => StorageService()),
         Provider(create: (_) => PresenceService()),
