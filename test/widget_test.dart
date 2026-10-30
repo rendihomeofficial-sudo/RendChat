@@ -1,30 +1,45 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:messenger_app/main.dart';
+import 'package:messenger_app/models/user_model.dart';
+import 'package:messenger_app/models/message_model.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MessengerApp());
+  group('Model Unit Tests', () {
+    test('AppUser blockedUsers and isBlocked behavior', () {
+      final now = DateTime.now();
+      final user = AppUser(
+        uid: 'user1',
+        email: 'user1@example.com',
+        displayName: 'User One',
+        lastSeen: now,
+        createdAt: now,
+        blockedUsers: const ['user2', 'user3'],
+      );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      expect(user.isBlocked('user2'), isTrue);
+      expect(user.isBlocked('user3'), isTrue);
+      expect(user.isBlocked('user4'), isFalse);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+      final updated = user.copyWith(blockedUsers: ['user4']);
+      expect(updated.isBlocked('user4'), isTrue);
+      expect(updated.isBlocked('user2'), isFalse);
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('Message copyWith and reaction properties', () {
+      final now = DateTime.now();
+      final msg = Message(
+        id: 'msg1',
+        chatId: 'chat1',
+        senderId: 'user1',
+        senderName: 'User One',
+        text: 'Hello World',
+        createdAt: now,
+        reactions: const {'user2': '❤️'},
+        starredBy: const ['user1'],
+      );
+
+      expect(msg.isStarredBy('user1'), isTrue);
+      expect(msg.isStarredBy('user2'), isFalse);
+      expect(msg.reactions['user2'], equals('❤️'));
+    });
   });
 }
