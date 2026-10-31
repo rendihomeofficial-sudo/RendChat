@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../theme/whatsapp_theme.dart';
 
@@ -6,6 +7,7 @@ class StatusViewerScreen extends StatefulWidget {
   final String userName;
   final String? userAvatar;
   final String statusText;
+  final String? mediaUrl;
   final Color backgroundColor;
 
   const StatusViewerScreen({
@@ -13,6 +15,7 @@ class StatusViewerScreen extends StatefulWidget {
     required this.userName,
     this.userAvatar,
     required this.statusText,
+    this.mediaUrl,
     this.backgroundColor = const Color(0xFF005C4B),
   });
 
@@ -50,26 +53,64 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: widget.backgroundColor,
+      backgroundColor: widget.mediaUrl != null ? Colors.black : widget.backgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
-            // Centered Status Text
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                child: Text(
-                  widget.statusText,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
+            // Media or Text
+            if (widget.mediaUrl != null && widget.mediaUrl!.isNotEmpty)
+              Positioned.fill(
+                child: CachedNetworkImage(
+                  imageUrl: widget.mediaUrl!,
+                  fit: BoxFit.contain,
+                  placeholder: (_, __) => const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                  errorWidget: (_, __, ___) => const Center(
+                    child: Icon(Icons.broken_image, color: Colors.white54, size: 48),
                   ),
                 ),
               ),
-            ),
+
+            // Caption or Centered Status Text
+            if (widget.statusText.isNotEmpty)
+              widget.mediaUrl != null
+                  ? Positioned(
+                      bottom: 72,
+                      left: 16,
+                      right: 16,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          widget.statusText,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                        child: Text(
+                          widget.statusText,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
 
             // Top Status Bar Header
             Column(

@@ -77,6 +77,33 @@ class StorageService {
     }
   }
 
+  // Upload status photo or media
+  Future<String?> uploadStatusMedia({
+    required String userId,
+    required String filePath,
+    Uint8List? fileBytes,
+    required String fileName,
+  }) async {
+    try {
+      final ext = fileName.contains('.') ? fileName.split('.').last : 'jpg';
+      final uniqueName = '${_uuid.v4()}_$fileName';
+      final ref = _storage.ref().child('statuses/$userId/$uniqueName');
+
+      UploadTask task;
+      if (kIsWeb || fileBytes != null) {
+        if (fileBytes == null) throw Exception('File bytes required on web');
+        task = ref.putData(fileBytes, SettableMetadata(contentType: _guessMime(ext)));
+      } else {
+        task = ref.putFile(File(filePath), SettableMetadata(contentType: _guessMime(ext)));
+      }
+      final snapshot = await task;
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      debugPrint('Status media upload error: $e');
+      return null;
+    }
+  }
+
   String _guessMime(String ext) {
     switch (ext.toLowerCase()) {
       // Documents

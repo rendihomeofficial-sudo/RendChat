@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_model.dart';
@@ -9,6 +10,7 @@ import '../models/call_model.dart';
 import '../services/app_update_service.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
+import '../services/storage_service.dart';
 import '../services/lock_chat_passcode_manager.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/user_avatar.dart';
@@ -47,6 +49,61 @@ class _HomeScreenState extends State<HomeScreen> {
       AppUpdateService.instance.checkUpdateOnStartup();
       _listenIncomingCalls();
     });
+  }
+
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _captureAndPostMediaStatus({bool fromCamera = true}) async {
+    final auth = context.read<AuthService>();
+    final chatService = context.read<ChatService>();
+    final storageService = context.read<StorageService>();
+    final user = auth.appUser;
+    if (user == null) return;
+
+    try {
+      final picked = await _picker.pickImage(
+        source: fromCamera ? ImageSource.camera : ImageSource.gallery,
+        imageQuality: 75,
+      );
+      if (picked == null) return;
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mengunggah foto status...')),
+      );
+
+      final bytes = await picked.readAsBytes();
+      final url = await storageService.uploadStatusMedia(
+        userId: user.uid,
+        filePath: picked.path,
+        fileBytes: bytes,
+        fileName: picked.name,
+      );
+
+      if (url != null) {
+        await chatService.postStatus(
+          userId: user.uid,
+          userName: user.displayName,
+          userAvatar: user.photoURL,
+          text: '',
+          mediaUrl: url,
+          backgroundColor: 0xFF000000,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Status foto berhasil dipublikasikan!')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error uploading media status: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal membuat status: $e')),
+        );
+      }
+    }
   }
 
   void _listenIncomingCalls() {
@@ -262,11 +319,7 @@ class _HomeScreenState extends State<HomeScreen> {
         IconButton(
           icon: const Icon(Icons.camera_alt_outlined),
           tooltip: 'Camera',
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('RenChat Camera opened')),
-            );
-          },
+          onPressed: () => _captureAndPostMediaStatus(fromCamera: true),
         ),
         IconButton(
           icon: const Icon(Icons.search_rounded),
@@ -366,18 +419,7 @@ class _HomeScreenState extends State<HomeScreen> {
             FloatingActionButton(
               tooltip: 'Add Status',
               child: const Icon(Icons.camera_alt_rounded),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const StatusViewerScreen(
-                      userName: 'My Status',
-                      statusText: '🚀 Hello RenChat! Enjoying the new messenger.',
-                      backgroundColor: Color(0xFF005C4B),
-                    ),
-                  ),
-                );
-              },
+              onPressed: () => _captureAndPostMediaStatus(fromCamera: true),
             ),
           ],
         );
@@ -699,14 +741,47 @@ class _HomeScreenState extends State<HomeScreen> {
                         userName: 'My Status',
                         userAvatar: currentUser.photoURL,
                         statusText: latest.text,
+                        mediaUrl: latest.mediaUrl,
                         backgroundColor: Color(latest.backgroundColor),
                       ),
                     ),
                   );
                 } else {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const TextStatusComposerScreen()),
+                  showModalBottomSheet(
+                    context: context,
+                    builder: (ctx) => SafeArea(
+                      child: Wrap(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.camera_alt_rounded, color: WhatsAppTheme.primaryTeal),
+                            title: const Text('Ambil Foto Kamera'),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _captureAndPostMediaStatus(fromCamera: true);
+                            },
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.photo_library_rounded, color: WhatsAppTheme.primaryTeal),
+                            title: const Text('Pilih dari Galeri'),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _captureAndPostMediaStatus(fromCamera: false);
+                            },
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.edit_rounded, color: WhatsAppTheme.primaryTeal),
+                            title: const Text('Buat Status Teks'),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const TextStatusComposerScreen()),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                   );
                 }
               },
@@ -767,6 +842,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           userName: st.userName,
                           userAvatar: st.userAvatar,
                           statusText: st.text,
+                          mediaUrl: st.mediaUrl,
                           backgroundColor: Color(st.backgroundColor),
                         ),
                       ),
