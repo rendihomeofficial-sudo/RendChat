@@ -49,7 +49,11 @@ app.*.map.json
 
 # Root APK & Screenshots
 *.apk
-*.png
+/*.png
+screenshots/
+
+# Un-ignore app launcher icons in Android res
+!android/app/src/main/res/**/*.png
 
 # Android Keystore & Signing properties
 *.jks
