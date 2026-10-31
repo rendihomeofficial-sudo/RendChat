@@ -80,7 +80,7 @@ jobs:
         run: flutter test
 
       - name: Build Android Release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --build-name=1.2.0 --build-number=3
 
       - name: Prepare Artifacts & Calculate Checksum
         run: |
