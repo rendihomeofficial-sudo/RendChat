@@ -17,6 +17,12 @@ class NotificationService {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
+        await _fcm.setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+
         final token = await _fcm.getToken();
         if (token != null) {
           await _saveToken(uid, token);
@@ -24,6 +30,16 @@ class NotificationService {
 
         _fcm.onTokenRefresh.listen((newToken) {
           _saveToken(uid, newToken);
+        });
+
+        // Tangani pesan saat aplikasi aktif di latar depan
+        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+          debugPrint('Pesan diterima di foreground: ${message.notification?.title}');
+        });
+
+        // Tangani saat notifikasi di-klik oleh pengguna
+        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+          debugPrint('Notifikasi dibuka oleh pengguna: ${message.data}');
         });
       }
     } catch (e) {

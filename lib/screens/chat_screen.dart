@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/chat_model.dart';
 import '../models/message_model.dart';
@@ -15,6 +18,7 @@ import '../services/storage_service.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/poll_creator_dialog.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/voice_note_player_widget.dart';
 import 'call_screen.dart';
 import 'contact_info_screen.dart';
 import 'media_gallery_screen.dart';
@@ -47,9 +51,17 @@ class _ChatScreenState extends State<ChatScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
+  // Real Audio Recorder
+  late final AudioRecorder _audioRecorder;
+  bool _isRecordingVoice = false;
+  int _recordDurationSeconds = 0;
+  Timer? _recordTimer;
+  String? _recordedFilePath;
+
   @override
   void initState() {
     super.initState();
+    _audioRecorder = AudioRecorder();
     final auth = context.read<AuthService>();
     final chatService = context.read<ChatService>();
     final myUid = auth.currentUid;
@@ -60,12 +72,118 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _recordTimer?.cancel();
+    _audioRecorder.dispose();
     _typingDebounce?.cancel();
     _textController.dispose();
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
+
+  Future<void> _startRecording() async {
+    try {
+      if (await _audioRecorder.hasPermission()) {
+        final tempDir = await getTemporaryDirectory();
+        final path = '${tempDir.path}/vn_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        await _audioRecorder.start(
+          const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000),
+          path: path,
+        );
+        setState(() {
+          _isRecordingVoice = true;
+          _recordDurationSeconds = 0;
+          _recordedFilePath = path;
+        });
+        _recordTimer?.cancel();
+        _recordTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+          if (mounted) {
+            setState(() => _recordDurationSeconds++);
+          }
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Izin mikrofon diperlukan untuk merekam suara.')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error starting recording: $e');
+    }
+  }
+
+  Future<void> _stopAndSendRecording() async {
+    _recordTimer?.cancel();
+    try {
+      final path = await _audioRecorder.stop();
+      final sec = _recordDurationSeconds;
+      setState(() {
+        _isRecordingVoice = false;
+        _recordDurationSeconds = 0;
+      });
+
+      final finalPath = path ?? _recordedFilePath;
+      if (finalPath == null) return;
+
+      final file = File(finalPath);
+      if (!await file.exists()) return;
+      final bytes = await file.readAsBytes();
+
+      if (bytes.isEmpty || sec < 1) {
+        return;
+      }
+
+      setState(() {
+        _isUploading = true;
+        _uploadStatus = 'Mengirim pesan suara...';
+      });
+
+      final auth = context.read<AuthService>();
+      final chatService = context.read<ChatService>();
+      final storageService = context.read<StorageService>();
+      final user = auth.appUser;
+      if (user == null) return;
+
+      final url = await storageService.uploadChatFile(
+        chatId: widget.chat.id,
+        filePath: finalPath,
+        fileBytes: bytes,
+        originalFileName: 'Voice_Note.m4a',
+      );
+
+      if (url != null) {
+        await chatService.sendMessage(
+          chatId: widget.chat.id,
+          senderId: user.uid,
+          senderName: user.displayName,
+          text: 'Pesan Suara (${sec}d)',
+          type: MessageType.voice,
+          durationSeconds: sec,
+          mediaUrl: url,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error stopping recording: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+          _uploadStatus = '';
+        });
+      }
+    }
+  }
+
+  Future<void> _cancelRecording() async {
+    _recordTimer?.cancel();
+    await _audioRecorder.cancel();
+    setState(() {
+      _isRecordingVoice = false;
+      _recordDurationSeconds = 0;
+    });
+  }
+
 
   void _onTextChanged(String text) {
     setState(() {
@@ -805,6 +923,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           callerName: title,
                           callerAvatar: otherUid != null ? widget.chat.getDisplayAvatar(currentUser.uid) : null,
                           isVideo: true,
+                          receiverId: otherUid,
                         ),
                       ),
                     );
@@ -827,6 +946,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           callerName: title,
                           callerAvatar: otherUid != null ? widget.chat.getDisplayAvatar(currentUser.uid) : null,
                           isVideo: false,
+                          receiverId: otherUid,
                         ),
                       ),
                     );
@@ -1201,65 +1321,88 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: WhatsAppTheme.darkSurface,
                   borderRadius: BorderRadius.circular(25),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.emoji_emotions_outlined, color: WhatsAppTheme.darkTextSecondary),
-                      onPressed: () => _showEmojiPickerBottomSheet(context),
-                      tooltip: 'Emoji',
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: _textController,
-                        onChanged: _onTextChanged,
-                        textCapitalization: TextCapitalization.sentences,
-                        maxLines: 5,
-                        minLines: 1,
-                        style: const TextStyle(fontSize: 16, color: WhatsAppTheme.darkTextPrimary),
-                        decoration: const InputDecoration(
-                          hintText: 'Message',
-                          hintStyle: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 16),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-                          border: InputBorder.none,
+                child: _isRecordingVoice
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.fiber_manual_record, color: Colors.red, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Recording 0:${_recordDurationSeconds.toString().padLeft(2, '0')}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                              tooltip: 'Cancel',
+                              onPressed: _cancelRecording,
+                            ),
+                          ],
                         ),
-                        onSubmitted: (_) => _sendMessage(),
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.emoji_emotions_outlined, color: WhatsAppTheme.darkTextSecondary),
+                            onPressed: () => _showEmojiPickerBottomSheet(context),
+                            tooltip: 'Emoji',
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: _textController,
+                              onChanged: _onTextChanged,
+                              textCapitalization: TextCapitalization.sentences,
+                              maxLines: 5,
+                              minLines: 1,
+                              style: const TextStyle(fontSize: 16, color: WhatsAppTheme.darkTextPrimary),
+                              decoration: const InputDecoration(
+                                hintText: 'Message',
+                                hintStyle: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 16),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                                border: InputBorder.none,
+                              ),
+                              onSubmitted: (_) => _sendMessage(),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.attach_file_rounded, color: WhatsAppTheme.darkTextSecondary),
+                            onPressed: () => _showAttachmentBottomSheet(context),
+                            tooltip: 'Attach',
+                          ),
+                          if (!_hasInputText)
+                            IconButton(
+                              icon: const Icon(Icons.camera_alt_rounded, color: WhatsAppTheme.darkTextSecondary),
+                              onPressed: () => _pickAndSendImage(fromCamera: true),
+                              tooltip: 'Camera',
+                            ),
+                        ],
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.attach_file_rounded, color: WhatsAppTheme.darkTextSecondary),
-                      onPressed: () => _showAttachmentBottomSheet(context),
-                      tooltip: 'Attach',
-                    ),
-                    if (!_hasInputText)
-                      IconButton(
-                        icon: const Icon(Icons.camera_alt_rounded, color: WhatsAppTheme.darkTextSecondary),
-                        onPressed: () => _pickAndSendImage(fromCamera: true),
-                        tooltip: 'Camera',
-                      ),
-                  ],
-                ),
               ),
             ),
             const SizedBox(width: 6),
             CircleAvatar(
               radius: 24,
-              backgroundColor: WhatsAppTheme.primaryTeal,
+              backgroundColor: _isRecordingVoice ? Colors.red : WhatsAppTheme.primaryTeal,
               child: IconButton(
                 icon: Icon(
-                  _hasInputText ? Icons.send_rounded : Icons.mic_rounded,
+                  _hasInputText
+                      ? Icons.send_rounded
+                      : (_isRecordingVoice ? Icons.stop_rounded : Icons.mic_rounded),
                   color: Colors.white,
                   size: 22,
                 ),
                 onPressed: _hasInputText
                     ? _sendMessage
-                    : () {
-                        _sendSimulatedVoiceNote();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Voice Note recorded & sent')),
-                        );
-                      },
-                tooltip: _hasInputText ? 'Send' : 'Voice Message',
+                    : (_isRecordingVoice ? _stopAndSendRecording : _startRecording),
+                tooltip: _hasInputText
+                    ? 'Send'
+                    : (_isRecordingVoice ? 'Send Voice Note' : 'Record Voice Note'),
               ),
             ),
           ],
@@ -1806,6 +1949,13 @@ class _WhatsAppMessageBubble extends StatelessWidget {
 
   // Interactive Voice Note Widget
   Widget _buildVoiceNoteWidget(BuildContext context) {
+    if (message.mediaUrl != null && message.mediaUrl!.isNotEmpty) {
+      return VoiceNotePlayerWidget(
+        audioUrl: message.mediaUrl!,
+        durationSeconds: message.durationSeconds ?? 5,
+        isMe: isMe,
+      );
+    }
     return Container(
       width: 240,
       padding: const EdgeInsets.symmetric(vertical: 4),

@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0",
-  "version_code": 2,
-  "title": "RenChat v1.1.0 - Pembaruan Resmi WhatsApp Style",
-  "release_notes": "• Fitur Blokir & Buka Blokir (Block/Unblock) kontak secara penuh\n• Kunci Obrolan Rahasia (Locked Chats) dengan keamanan PIN\n• Penyematan obrolan (Pin Chat) hingga 3 kontak penting\n• Arsip obrolan (Archive Chat)\n• Autentikasi Google Sign-In resmi & aman\n• Perbaikan sinkronisasi unread counter & Firestore Security Rules",
+  "version": "1.2.0",
+  "version_code": 3,
+  "title": "RenChat v1.2.0 - Status, Calls & Voice Note Update",
+  "release_notes": "• Fitur Status / Story WhatsApp nyata 24 jam dengan teks & media\n• Panggilan Suara & Panggilan Video langsung di aplikasi\n• Perekaman Pesan Suara (Voice Note .m4a) & Pemutar Audio interaktif\n• Kamera terintegrasi langsung untuk obrolan & status\n• Notifikasi background push tetap aktif saat aplikasi ditutup\n• Peningkatan keamanan Cloud Firestore & APK resmi terverifikasi",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }

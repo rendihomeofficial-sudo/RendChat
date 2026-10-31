@@ -73,11 +73,15 @@ class AuthService extends ChangeNotifier {
 
     try {
       final snap = await userRef.get();
+      final defaultName = user.displayName?.trim().isNotEmpty == true
+          ? user.displayName!.trim()
+          : (user.email?.split('@').first ?? 'User');
+
       if (!snap.exists) {
         final newUser = AppUser(
           uid: user.uid,
           email: user.email ?? '',
-          displayName: user.displayName ?? (user.email?.split('@').first ?? 'User'),
+          displayName: defaultName,
           photoURL: user.photoURL,
           statusMessage: 'Hey there! I am using Messenger.',
           online: true,
@@ -87,9 +91,16 @@ class AuthService extends ChangeNotifier {
         );
         await userRef.set(newUser);
       } else {
+        final existing = snap.data();
         await userRef.update({
           'online': true,
           'lastSeen': Timestamp.now(),
+          if (existing?.displayName == null || existing!.displayName.isEmpty || existing.displayName == 'User')
+            if (user.displayName != null && user.displayName!.trim().isNotEmpty)
+              'displayName': user.displayName!.trim(),
+          if (existing?.photoURL == null || existing!.photoURL!.isEmpty)
+            if (user.photoURL != null && user.photoURL!.isNotEmpty)
+              'photoURL': user.photoURL,
         });
       }
     } catch (e) {
@@ -128,28 +139,44 @@ class AuthService extends ChangeNotifier {
         final googleProvider = GoogleAuthProvider()
           ..addScope('email')
           ..addScope('profile');
-        return await _auth.signInWithPopup(googleProvider);
+        final userCredential = await _auth.signInWithPopup(googleProvider);
+        if (userCredential.user != null) {
+          _firebaseUser = userCredential.user;
+          await _syncUserToFirestore(userCredential.user!);
+          await _fetchAppUser(userCredential.user!.uid);
+        }
+        return userCredential;
       }
 
       if (!_googleReady) {
-        // Beri kesempatan inisialisasi selesai sebelum dipakai.
         await _initGoogle();
       }
 
-      final GoogleSignInAccount googleUser =
-          await GoogleSignIn.instance.authenticate();
+      final GoogleSignInAccount googleUser;
+      try {
+        googleUser = await GoogleSignIn.instance.authenticate();
+      } on GoogleSignInException catch (e) {
+        if (e.code == GoogleSignInExceptionCode.canceled ||
+            e.code == GoogleSignInExceptionCode.interrupted) {
+          debugPrint('Pengguna membatalkan login Google: ${e.code}');
+          return null;
+        }
+        rethrow;
+      }
 
       final GoogleSignInAuthentication auth = googleUser.authentication;
       final String? idToken = auth.idToken;
       if (idToken == null || idToken.isEmpty) {
-        throw Exception('Gagal memperoleh token Google. Silakan coba lagi.');
+        throw Exception('Gagal memperoleh token autentikasi Google. Silakan coba lagi.');
       }
 
       final credential = GoogleAuthProvider.credential(idToken: idToken);
       final userCredential = await _auth.signInWithCredential(credential);
 
       if (userCredential.user != null) {
+        _firebaseUser = userCredential.user;
         await _syncUserToFirestore(userCredential.user!);
+        await _fetchAppUser(userCredential.user!.uid);
       }
       return userCredential;
     } finally {

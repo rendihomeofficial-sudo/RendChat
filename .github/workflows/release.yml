@@ -1,0 +1,131 @@
+name: Build & Release RenChat APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for release (e.g. v1.1.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build & Publish Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Verify Flutter & Java Environment
+        run: |
+          flutter --version
+          java -version
+
+      - name: Configure Keystore & Signing Properties
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'RenChatRelease2026!' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'RenChatRelease2026!' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'upload' }}
+        run: |
+          mkdir -p android/app
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Decoding KEYSTORE_BASE64 from GitHub Secrets..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          else
+            echo "KEYSTORE_BASE64 secret not found. Checking if keystore already exists or generating fallback keystore..."
+            if [ ! -f "android/app/upload-keystore.jks" ]; then
+              keytool -genkeypair -v -keystore android/app/upload-keystore.jks \
+                -alias "$KEY_ALIAS" \
+                -keyalg RSA -keysize 2048 -validity 10000 \
+                -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" \
+                -dname "CN=RenChat, OU=Mobile Development, O=RenChat Official, L=Jakarta, ST=DKI Jakarta, C=ID"
+            fi
+          fi
+
+          echo "Generating android/key.properties..."
+          cat <<EOF > android/key.properties
+          storePassword=$STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Run Flutter Tests
+        run: flutter test
+
+      - name: Build Android Release APK
+        run: flutter build apk --release
+
+      - name: Prepare Artifacts & Calculate Checksum
+        run: |
+          APK_SOURCE="build/app/outputs/flutter-apk/app-release.apk"
+          if [ ! -f "$APK_SOURCE" ]; then
+            echo "Error: app-release.apk not found!"
+            exit 1
+          fi
+          
+          # Copy to final release name
+          cp "$APK_SOURCE" RenChat.apk
+          
+          # Compute sha256
+          sha256sum RenChat.apk > RenChat.apk.sha256
+          
+          echo "Release APK generated successfully:"
+          ls -lh RenChat.apk RenChat.apk.sha256
+          cat RenChat.apk.sha256
+
+      - name: Determine Release Tag & Version Info
+        id: release_info
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+          elif [ -n "${{ github.ref_name }}" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$(node -p "require('./version.json').version")"
+          fi
+          
+          TITLE="$(node -p "require('./version.json').title || 'RenChat Release ' + '$TAG'")"
+          
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          name: ${{ steps.release_info.outputs.title }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            RenChat.apk
+            RenChat.apk.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

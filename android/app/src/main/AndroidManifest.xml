@@ -8,6 +8,10 @@
     <!-- Notifikasi push (Android 13+ memerlukan izin runtime) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!-- Izin Kamera dan Audio untuk pengambilan foto & panggilan suara/video -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+
     <!-- Izin instalar APK pembaruan langsung dari aplikasi -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
@@ -16,6 +20,12 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
+
+        <!-- Default notification channel untuk Firebase Cloud Messaging saat APK di background -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="chat_messages" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

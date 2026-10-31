@@ -45,23 +45,24 @@ async function uploadRelease() {
 
   const owner = 'rendihomeofficial-sudo';
   const repo = 'RendChat';
-  const tag = 'v1.1.0';
+  const tag = process.argv[2] || ('v' + manifest.version);
 
-  // Find APK
-  const apkPath = path.join(__dirname, '..', 'build', 'app', 'outputs', 'flutter-apk', 'app-release.apk');
+  // Target signed APK
   const targetApk = path.join(__dirname, '..', 'build', 'app', 'outputs', 'flutter-apk', 'RenChat.apk');
+  const fallbackApk = path.join(__dirname, '..', 'RenChat.apk');
 
-  if (!fs.existsSync(apkPath) && !fs.existsSync(targetApk)) {
-    console.error('Release APK not found at', apkPath);
-    process.exit(1);
+  let chosenApk = targetApk;
+  if (!fs.existsSync(chosenApk)) {
+    if (fs.existsSync(fallbackApk)) {
+      chosenApk = fallbackApk;
+    } else {
+      console.error('RenChat.apk not found!');
+      process.exit(1);
+    }
   }
 
-  if (fs.existsSync(apkPath)) {
-    fs.copyFileSync(apkPath, targetApk);
-    console.log('Copied app-release.apk -> RenChat.apk');
-  }
-
-  const apkStats = fs.statSync(targetApk);
+  const apkStats = fs.statSync(chosenApk);
+  console.log(`Using signed APK: ${chosenApk}`);
   console.log(`APK Size: ${(apkStats.size / (1024 * 1024)).toFixed(2)} MB`);
 
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'version.json'), 'utf8'));
@@ -133,7 +134,7 @@ async function uploadRelease() {
   const uploadUrl = release.upload_url.replace(/\{(\?.*)?\}$/, '');
   const parsedUrl = new URL(uploadUrl);
 
-  const fileStream = fs.createReadStream(targetApk);
+  const fileStream = fs.createReadStream(chosenApk);
   const uploadReq = https.request({
     hostname: parsedUrl.hostname,
     path: `${parsedUrl.pathname}?name=RenChat.apk`,

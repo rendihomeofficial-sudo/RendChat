@@ -21,10 +21,20 @@ class _AuthScreenState extends State<AuthScreen> {
     });
     try {
       final auth = context.read<AuthService>();
-      await auth.signInWithGoogle();
+      final cred = await auth.signInWithGoogle();
+      if (!mounted) return;
+      if (cred == null) {
+        // Pengguna membatalkan dialog akun Google
+        setState(() {
+          _isGoogleBusy = false;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
-      final message = e.toString().replaceFirst(RegExp(r'\[.*?\] '), '');
+      String message = e.toString().replaceFirst(RegExp(r'\[.*?\] '), '');
+      if (message.contains('ApiException: 10') || message.contains('DEVELOPER_ERROR')) {
+        message = 'Konfigurasi Google Play Services sedang diperbarui. Pastikan koneksi internet aktif dan coba lagi.';
+      }
       setState(() {
         _errorMessage = message;
         _isGoogleBusy = false;

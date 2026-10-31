@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/chat_model.dart';
 import '../models/message_model.dart';
 import '../models/user_model.dart';
+import '../models/status_model.dart';
+import '../models/call_model.dart';
 
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -545,6 +547,134 @@ class ChatService {
     return _usersRef.doc(currentUserId).snapshots().map((snap) {
       final user = snap.data();
       return user?.blockedUsers ?? const [];
+    });
+  }
+
+  // STATUS / STORY FEATURES
+  CollectionReference<StatusModel> get _statusRef => _firestore
+      .collection('statuses')
+      .withConverter<StatusModel>(
+        fromFirestore: StatusModel.fromFirestore,
+        toFirestore: (s, _) => s.toFirestore(),
+      );
+
+  Future<void> postStatus({
+    required String userId,
+    required String userName,
+    String? userAvatar,
+    required String text,
+    String? mediaUrl,
+    required int backgroundColor,
+  }) async {
+    final docRef = _statusRef.doc();
+    final status = StatusModel(
+      id: docRef.id,
+      userId: userId,
+      userName: userName,
+      userAvatar: userAvatar,
+      text: text,
+      mediaUrl: mediaUrl,
+      backgroundColor: backgroundColor,
+      createdAt: DateTime.now(),
+      viewedBy: [userId],
+    );
+    await docRef.set(status);
+  }
+
+  Stream<List<StatusModel>> streamActiveStatuses() {
+    final cutoff = DateTime.now().subtract(const Duration(hours: 24));
+    return _statusRef
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff))
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.data()).toList());
+  }
+
+  Future<void> markStatusViewed({
+    required String statusId,
+    required String viewerId,
+  }) async {
+    final docRef = _firestore.collection('statuses').doc(statusId);
+    await docRef.update({
+      'viewedBy': FieldValue.arrayUnion([viewerId]),
+    });
+  }
+
+  // CALL FEATURES & SIGNALING
+  CollectionReference<CallModel> get _callsRef => _firestore
+      .collection('calls')
+      .withConverter<CallModel>(
+        fromFirestore: CallModel.fromFirestore,
+        toFirestore: (c, _) => c.toFirestore(),
+      );
+
+  Future<String> initiateCall({
+    required String callerId,
+    required String callerName,
+    String? callerAvatar,
+    required String receiverId,
+    required String receiverName,
+    String? receiverAvatar,
+    required bool isVideo,
+  }) async {
+    final docRef = _callsRef.doc();
+    final call = CallModel(
+      id: docRef.id,
+      callerId: callerId,
+      callerName: callerName,
+      callerAvatar: callerAvatar,
+      receiverId: receiverId,
+      receiverName: receiverName,
+      receiverAvatar: receiverAvatar,
+      isVideo: isVideo,
+      status: 'calling',
+      createdAt: DateTime.now(),
+    );
+    await docRef.set(call);
+    return docRef.id;
+  }
+
+  Future<void> updateCallStatus(
+    String callId,
+    String status, {
+    int? durationSeconds,
+  }) async {
+    final updates = <String, dynamic>{
+      'status': status,
+      if (durationSeconds != null) 'durationSeconds': durationSeconds,
+    };
+    await _firestore.collection('calls').doc(callId).update(updates);
+  }
+
+  Stream<List<CallModel>> streamUserCalls(String userId) {
+    return _firestore
+        .collection('calls')
+        .where('callerId', isEqualTo: userId)
+        .snapshots()
+        .asyncMap((callerSnap) async {
+      final receiverSnap = await _firestore
+          .collection('calls')
+          .where('receiverId', isEqualTo: userId)
+          .get();
+
+      final all = <CallModel>[];
+      all.addAll(callerSnap.docs.map((d) => CallModel.fromFirestore(d, null)));
+      all.addAll(receiverSnap.docs.map((d) => CallModel.fromFirestore(d, null)));
+      all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return all;
+    });
+  }
+
+  Stream<CallModel?> streamIncomingCall(String currentUserId) {
+    return _firestore
+        .collection('calls')
+        .where('receiverId', isEqualTo: currentUserId)
+        .where('status', isEqualTo: 'calling')
+        .limit(1)
+        .snapshots()
+        .map((snap) {
+      if (snap.docs.isEmpty) return null;
+      return CallModel.fromFirestore(snap.docs.first, null);
     });
   }
 }

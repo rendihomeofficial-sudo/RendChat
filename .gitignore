@@ -50,3 +50,12 @@ app.*.map.json
 # Root APK & Screenshots
 *.apk
 *.png
+
+# Android Keystore & Signing properties
+*.jks
+*.keystore
+key.properties
+**/android/key.properties
+android/.kotlin/
+/android/build/
+

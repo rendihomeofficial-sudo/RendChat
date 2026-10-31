@@ -14,16 +14,24 @@
       },
       "oauth_client": [
         {
-          "client_id": "1062003220328-evnrsoocba1h9gm98eccgrv89gagv9b2.apps.googleusercontent.com",
-          "client_type": 3
+          "client_id": "1062003220328-q7fah70d94lh5v7qb2hj4k14914hl95c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.chat.messenger",
+            "certificate_hash": "a7b714bfa26fef5da4eae4fc6a946a4f5cd17114"
+          }
         },
         {
-          "client_id": "1062003220328-android.apps.googleusercontent.com",
+          "client_id": "1062003220328-u3ciltmuutpmlicn1hd57hrgruesjc7j.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.chat.messenger",
             "certificate_hash": "9ec0e3e892627fef3eb70813e130c9d5b25da7bf"
           }
+        },
+        {
+          "client_id": "1062003220328-evnrsoocba1h9gm98eccgrv89gagv9b2.apps.googleusercontent.com",
+          "client_type": 3
         }
       ],
       "api_key": [

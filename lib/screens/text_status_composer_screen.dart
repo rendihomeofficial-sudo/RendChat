@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
+import '../services/chat_service.dart';
 import '../theme/whatsapp_theme.dart';
 
 class TextStatusComposerScreen extends StatefulWidget {
@@ -101,13 +104,27 @@ class _TextStatusComposerScreenState extends State<TextStatusComposerScreen> {
                 backgroundColor: WhatsAppTheme.primaryTeal,
                 foregroundColor: Colors.white,
                 child: const Icon(Icons.send_rounded),
-                onPressed: () {
+                onPressed: () async {
                   final text = _controller.text.trim();
                   if (text.isNotEmpty) {
-                    Navigator.pop(context, text);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Status update posted!')),
-                    );
+                    final auth = context.read<AuthService>();
+                    final chatService = context.read<ChatService>();
+                    final user = auth.appUser;
+                    if (user != null) {
+                      await chatService.postStatus(
+                        userId: user.uid,
+                        userName: user.displayName,
+                        userAvatar: user.photoURL,
+                        text: text,
+                        backgroundColor: currentColor.value,
+                      );
+                    }
+                    if (context.mounted) {
+                      Navigator.pop(context, text);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Status berhasil dipublikasikan!')),
+                      );
+                    }
                   }
                 },
               ),

@@ -1,0 +1,6 @@
+# Template konfigurasi release signing key untuk RenChat Android.
+# Salin file ini menjadi 'key.properties' di direktori 'android/' dan sesuaikan nilainya:
+storePassword=YourKeystorePasswordHere
+keyPassword=YourKeyPasswordHere
+keyAlias=upload
+storeFile=upload-keystore.jks

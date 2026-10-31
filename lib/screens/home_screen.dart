@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_model.dart';
 import '../models/user_model.dart';
+import '../models/status_model.dart';
+import '../models/call_model.dart';
 import '../services/app_update_service.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
@@ -32,6 +35,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedFilter = 'All';
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
+  StreamSubscription<CallModel?>? _incomingCallSub;
+  String? _showingCallId;
 
   final List<String> _filters = ['All', 'Unread', 'Favorites', 'Groups'];
 
@@ -40,11 +45,95 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppUpdateService.instance.checkUpdateOnStartup();
+      _listenIncomingCalls();
     });
+  }
+
+  void _listenIncomingCalls() {
+    final auth = context.read<AuthService>();
+    final chatService = context.read<ChatService>();
+    final uid = auth.currentUid;
+    if (uid == null) return;
+
+    _incomingCallSub?.cancel();
+    _incomingCallSub = chatService.streamIncomingCall(uid).listen((incoming) {
+      if (incoming != null && incoming.id != _showingCallId && mounted) {
+        _showingCallId = incoming.id;
+        _showIncomingCallDialog(incoming);
+      }
+    });
+  }
+
+  void _showIncomingCallDialog(CallModel call) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1F2C34),
+        title: Text(
+          call.isVideo ? 'Incoming Video Call' : 'Incoming Voice Call',
+          style: const TextStyle(color: WhatsAppTheme.primaryTeal, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            UserAvatar(
+              name: call.callerName,
+              photoUrl: call.callerAvatar,
+              radius: 36,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              call.callerName,
+              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'RenChat Call...',
+              style: TextStyle(color: WhatsAppTheme.darkTextSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            icon: const Icon(Icons.call_end_rounded),
+            label: const Text('Decline'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<ChatService>().updateCallStatus(call.id, 'rejected');
+              _showingCallId = null;
+            },
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+            icon: Icon(call.isVideo ? Icons.videocam_rounded : Icons.call_rounded),
+            label: const Text('Accept'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _showingCallId = null;
+              context.read<ChatService>().updateCallStatus(call.id, 'connected');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CallScreen(
+                    callerName: call.callerName,
+                    callerAvatar: call.callerAvatar,
+                    isVideo: call.isVideo,
+                    existingCallId: call.id,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   void dispose() {
+    _incomingCallSub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -73,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildChatsTab(context, currentUser),
                 _buildUpdatesTab(context, currentUser),
                 _buildCommunitiesTab(context),
-                _buildCallsTab(context),
+                _buildCallsTab(context, currentUser),
               ],
             ),
           ),
@@ -543,126 +632,189 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // 2. UPDATES / STATUS TAB
   Widget _buildUpdatesTab(BuildContext context, AppUser currentUser) {
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(
-            'Status',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ),
-        ListTile(
-          leading: Stack(
-            children: [
-              UserAvatar(
-                name: currentUser.displayName,
-                photoUrl: currentUser.photoURL,
-                radius: 26,
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: const BoxDecoration(
-                    color: WhatsAppTheme.primaryTeal,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.add, size: 16, color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-          title: const Text('My status', style: TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: const Text('Tap to add status update', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const TextStatusComposerScreen()),
-            );
-          },
-        ),
-        const Divider(height: 24),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(
-            'Recent updates',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: WhatsAppTheme.darkTextSecondary,
-            ),
-          ),
-        ),
-        ListTile(
-          leading: Container(
-            padding: const EdgeInsets.all(2.5),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: WhatsAppTheme.primaryTeal, width: 2.2),
-            ),
-            child: const CircleAvatar(
-              radius: 22,
-              backgroundColor: Color(0xFF233138),
-              child: Text('BB', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ),
-          title: const Text('Bob Builder', style: TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: const Text('Today, 8:42 PM', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const StatusViewerScreen(
-                  userName: 'Bob Builder',
-                  statusText: '🛠️ Working on the new RenChat features! Check out the updates.',
-                  backgroundColor: Color(0xFF1E3A8A),
-                ),
-              ),
-            );
-          },
-        ),
-        const Divider(height: 24),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Channels',
+    final chatService = context.read<ChatService>();
+
+    return StreamBuilder<List<StatusModel>>(
+      stream: chatService.streamActiveStatuses(),
+      builder: (context, snapshot) {
+        final allStatuses = snapshot.data ?? [];
+        final myStatuses = allStatuses.where((s) => s.userId == currentUser.uid).toList();
+        final otherStatuses = allStatuses.where((s) => s.userId != currentUser.uid).toList();
+
+        return ListView(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'Status',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              Text(
-                'Explore >',
-                style: TextStyle(color: WhatsAppTheme.primaryTeal, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-        ListTile(
-          leading: const CircleAvatar(
-            backgroundColor: Color(0xFF008069),
-            child: Icon(Icons.campaign_rounded, color: Colors.white),
-          ),
-          title: const Text('RenChat Official', style: TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: const Text('Welcome to RenChat Channels! Get updates on new features.'),
-          trailing: OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: WhatsAppTheme.primaryTeal,
-              side: const BorderSide(color: WhatsAppTheme.primaryTeal),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             ),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('You are now following RenChat Channel!')),
-              );
-            },
-            child: const Text('Follow'),
-          ),
-        ),
-      ],
+            ListTile(
+              leading: Stack(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: myStatuses.isNotEmpty
+                          ? Border.all(color: WhatsAppTheme.primaryTeal, width: 2.2)
+                          : null,
+                    ),
+                    child: UserAvatar(
+                      name: currentUser.displayName,
+                      photoUrl: currentUser.photoURL,
+                      radius: 24,
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: WhatsAppTheme.primaryTeal,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.add, size: 16, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+              title: const Text('My status', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(
+                myStatuses.isNotEmpty
+                    ? 'Published ${DateFormat('h:mm a').format(myStatuses.first.createdAt)} • ${myStatuses.length} update'
+                    : 'Tap to add status update',
+                style: const TextStyle(color: WhatsAppTheme.darkTextSecondary),
+              ),
+              onTap: () {
+                if (myStatuses.isNotEmpty) {
+                  final latest = myStatuses.first;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StatusViewerScreen(
+                        userName: 'My Status',
+                        userAvatar: currentUser.photoURL,
+                        statusText: latest.text,
+                        backgroundColor: Color(latest.backgroundColor),
+                      ),
+                    ),
+                  );
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TextStatusComposerScreen()),
+                  );
+                }
+              },
+            ),
+            const Divider(height: 24),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'Recent updates',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: WhatsAppTheme.darkTextSecondary,
+                ),
+              ),
+            ),
+            if (otherStatuses.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                child: Text(
+                  'No recent status updates from your contacts.',
+                  style: TextStyle(color: WhatsAppTheme.darkTextSecondary),
+                ),
+              )
+            else
+              ...otherStatuses.map((st) {
+                final isViewed = st.isViewedBy(currentUser.uid);
+                return ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isViewed ? Colors.white24 : WhatsAppTheme.primaryTeal,
+                        width: 2.2,
+                      ),
+                    ),
+                    child: UserAvatar(
+                      name: st.userName,
+                      photoUrl: st.userAvatar,
+                      radius: 22,
+                    ),
+                  ),
+                  title: Text(st.userName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(
+                    DateFormat('h:mm a').format(st.createdAt),
+                    style: const TextStyle(color: WhatsAppTheme.darkTextSecondary),
+                  ),
+                  onTap: () {
+                    chatService.markStatusViewed(
+                      statusId: st.id,
+                      viewerId: currentUser.uid,
+                    );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => StatusViewerScreen(
+                          userName: st.userName,
+                          userAvatar: st.userAvatar,
+                          statusText: st.text,
+                          backgroundColor: Color(st.backgroundColor),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              }),
+            const Divider(height: 24),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Channels',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    'Explore >',
+                    style: TextStyle(color: WhatsAppTheme.primaryTeal, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFF008069),
+                child: Icon(Icons.campaign_rounded, color: Colors.white),
+              ),
+              title: const Text('RenChat Official', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Welcome to RenChat Channels! Get updates on new features.'),
+              trailing: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: WhatsAppTheme.primaryTeal,
+                  side: const BorderSide(color: WhatsAppTheme.primaryTeal),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Subscribed to RenChat Official Channel')),
+                  );
+                },
+                child: const Text('Follow'),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -717,57 +869,105 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // 4. CALLS TAB
-  Widget _buildCallsTab(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      children: [
-        ListTile(
-          leading: const CircleAvatar(
-            backgroundColor: WhatsAppTheme.primaryTeal,
-            child: Icon(Icons.link_rounded, color: Colors.white),
-          ),
-          title: const Text('Create call link', style: TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: const Text('Share a link for your RenChat call', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
-          onTap: () {
-            _showCallLinkDialog(context);
-          },
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Text(
-            'Recent',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: WhatsAppTheme.darkTextSecondary),
-          ),
-        ),
-        ListTile(
-          leading: const CircleAvatar(
-            backgroundColor: Color(0xFF233138),
-            child: Text('BB', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          title: const Text('Bob Builder', style: TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: const Row(
-            children: [
-              Icon(Icons.call_received_rounded, size: 16, color: Colors.green),
-              SizedBox(width: 4),
-              Text('Yesterday, 9:15 PM', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
-            ],
-          ),
-          trailing: IconButton(
-            icon: const Icon(Icons.call_outlined, color: WhatsAppTheme.primaryTeal),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const CallScreen(
-                    callerName: 'Bob Builder',
-                    isVideo: false,
+  Widget _buildCallsTab(BuildContext context, AppUser currentUser) {
+    final chatService = context.read<ChatService>();
+
+    return StreamBuilder<List<CallModel>>(
+      stream: chatService.streamUserCalls(currentUser.uid),
+      builder: (context, snapshot) {
+        final calls = snapshot.data ?? [];
+
+        return ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: WhatsAppTheme.primaryTeal,
+                child: Icon(Icons.link_rounded, color: Colors.white),
+              ),
+              title: const Text('Create call link', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Share a link for your RenChat call',
+                  style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+              onTap: () {
+                _showCallLinkDialog(context);
+              },
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Text(
+                'Recent',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 15, color: WhatsAppTheme.darkTextSecondary),
+              ),
+            ),
+            if (calls.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                child: Center(
+                  child: Text(
+                    'No call history yet. Start a voice or video call from any chat!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: WhatsAppTheme.darkTextSecondary),
                   ),
                 ),
-              );
-            },
-          ),
-        ),
-      ],
+              )
+            else
+              ...calls.map((c) {
+                final isCaller = c.callerId == currentUser.uid;
+                final displayName = isCaller ? c.receiverName : c.callerName;
+                final displayAvatar = isCaller ? c.receiverAvatar : c.callerAvatar;
+                final isMissed = c.status == 'missed' || c.status == 'rejected';
+
+                return ListTile(
+                  leading: UserAvatar(
+                    name: displayName,
+                    photoUrl: displayAvatar,
+                    radius: 22,
+                  ),
+                  title: Text(
+                    displayName,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isMissed && !isCaller ? Colors.redAccent : null,
+                    ),
+                  ),
+                  subtitle: Row(
+                    children: [
+                      Icon(
+                        isCaller ? Icons.call_made_rounded : Icons.call_received_rounded,
+                        size: 16,
+                        color: isMissed ? Colors.redAccent : Colors.green,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${DateFormat('MMM d, h:mm a').format(c.createdAt)}${c.durationSeconds > 0 ? ' • ${c.durationSeconds}s' : ''}',
+                        style: const TextStyle(color: WhatsAppTheme.darkTextSecondary),
+                      ),
+                    ],
+                  ),
+                  trailing: IconButton(
+                    icon: Icon(
+                      c.isVideo ? Icons.videocam_outlined : Icons.call_outlined,
+                      color: WhatsAppTheme.primaryTeal,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CallScreen(
+                            callerName: displayName,
+                            callerAvatar: displayAvatar,
+                            isVideo: c.isVideo,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              }),
+          ],
+        );
+      },
     );
   }
 

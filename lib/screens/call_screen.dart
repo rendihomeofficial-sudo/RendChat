@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
+import '../services/chat_service.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/user_avatar.dart';
 
@@ -7,12 +10,16 @@ class CallScreen extends StatefulWidget {
   final String callerName;
   final String? callerAvatar;
   final bool isVideo;
+  final String? receiverId;
+  final String? existingCallId;
 
   const CallScreen({
     super.key,
     required this.callerName,
     this.callerAvatar,
     this.isVideo = false,
+    this.receiverId,
+    this.existingCallId,
   });
 
   @override
@@ -29,6 +36,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   int _callSeconds = 0;
   Timer? _callTimer;
   Timer? _connectTimer;
+  String? _activeCallId;
 
   // Pulse ring animation
   late AnimationController _pulseController;
@@ -37,6 +45,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
+    _activeCallId = widget.existingCallId;
     _isSpeaker = widget.isVideo;
     _pulseController = AnimationController(
       vsync: this,
@@ -46,15 +55,55 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    _initiateFirestoreCall();
+
     // Realistic WhatsApp call connection simulation (Ringing -> Connected)
     _connectTimer = Timer(const Duration(milliseconds: 2200), () {
       if (mounted) {
         setState(() {
           _isConnected = true;
         });
+        _updateCallConnected();
         _startTimer();
       }
     });
+  }
+
+  Future<void> _initiateFirestoreCall() async {
+    if (widget.existingCallId != null) return;
+    if (widget.receiverId != null) {
+      final auth = context.read<AuthService>();
+      final chatService = context.read<ChatService>();
+      final currentUser = auth.appUser;
+      if (currentUser != null) {
+        final id = await chatService.initiateCall(
+          callerId: currentUser.uid,
+          callerName: currentUser.displayName,
+          callerAvatar: currentUser.photoURL,
+          receiverId: widget.receiverId!,
+          receiverName: widget.callerName,
+          receiverAvatar: widget.callerAvatar,
+          isVideo: widget.isVideo,
+        );
+        _activeCallId = id;
+      }
+    }
+  }
+
+  void _updateCallConnected() {
+    if (_activeCallId != null) {
+      context.read<ChatService>().updateCallStatus(_activeCallId!, 'connected');
+    }
+  }
+
+  void _endCallInFirestore() {
+    if (_activeCallId != null) {
+      context.read<ChatService>().updateCallStatus(
+            _activeCallId!,
+            _isConnected ? 'ended' : 'missed',
+            durationSeconds: _callSeconds,
+          );
+    }
   }
 
   void _startTimer() {
@@ -522,6 +571,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                 onTap: () {
                   _connectTimer?.cancel();
                   _callTimer?.cancel();
+                  _endCallInFirestore();
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
