@@ -356,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _buildChatsTab(context, currentUser),
                 _buildUpdatesTab(context, currentUser),
-                _buildCommunitiesTab(context),
+                _buildCommunitiesTab(context, currentUser),
                 _buildCallsTab(context, currentUser),
               ],
             ),
@@ -1092,52 +1092,93 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // 3. COMMUNITIES TAB
-  Widget _buildCommunitiesTab(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildCommunitiesTab(BuildContext context, AppUser currentUser) {
+    final chatService = context.read<ChatService>();
+
+    return StreamBuilder<List<Chat>>(
+      stream: chatService.streamUserChats(currentUser.uid),
+      builder: (context, snapshot) {
+        final allChats = snapshot.data ?? [];
+        final communityChats = allChats
+            .where((c) => c.isGroup && (c.title?.startsWith('🌐') == true || c.title?.toLowerCase().contains('komunitas') == true || c.title?.toLowerCase().contains('community') == true))
+            .toList();
+
+        return ListView(
+          padding: const EdgeInsets.symmetric(vertical: 12),
           children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: WhatsAppTheme.darkPill,
-                borderRadius: BorderRadius.circular(20),
+            // Tombol Buat Komunitas Baru
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.group_add_rounded, color: WhatsAppTheme.primaryTeal, size: 26),
               ),
-              child: const Icon(
-                Icons.groups_rounded,
-                size: 80,
-                color: WhatsAppTheme.primaryTeal,
+              title: const Text('Buat Komunitas Baru', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Satukan grup bertopik dan bagikan pengumuman resmi', style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
+              onTap: () => _showNewCommunityDialog(context),
+            ),
+            const Divider(height: 24, indent: 72),
+            if (communityChats.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: WhatsAppTheme.darkPill,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(
+                        Icons.groups_rounded,
+                        size: 80,
+                        color: WhatsAppTheme.primaryTeal,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Tetap Terhubung dengan Komunitas',
+                      style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Komunitas menyatukan anggota dalam beberapa grup topik dan mempermudah pengiriman pengumuman admin.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13.5),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: WhatsAppTheme.primaryTeal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Mulai Komunitas Anda', style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () => _showNewCommunityDialog(context),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  'Komunitas Anda',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: WhatsAppTheme.darkTextSecondary),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Stay connected with a community',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Communities bring members together in topic-based groups, and make it easy to get admin announcements.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 14),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: WhatsAppTheme.primaryTeal,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-              icon: const Icon(Icons.add),
-              label: const Text('Start your community'),
-              onPressed: () {
-                _showNewCommunityDialog(context);
-              },
-            ),
+              ...communityChats.map((c) => _WhatsAppChatTile(chat: c, currentUserId: currentUser.uid)),
+            ],
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1351,40 +1392,65 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showNewCommunityDialog(BuildContext context) {
     final nameCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1B272C),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Row(
           children: [
-            Icon(Icons.groups_rounded, color: WhatsAppTheme.primaryTeal),
-            SizedBox(width: 8),
-            Text('New Community'),
+            Icon(Icons.groups_rounded, color: WhatsAppTheme.primaryTeal, size: 28),
+            SizedBox(width: 10),
+            Text('Komunitas Baru', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Bring members together in topic-based groups, and easily send admin announcements.',
-              style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Community Name',
-                border: OutlineInputBorder(),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Satukan grup-grup bertopik dan bagikan pengumuman resmi kepada seluruh anggota.',
+                style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary, height: 1.3),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Nama Komunitas',
+                  hintText: 'Misal: Warga RT 05 / Alumni 2020',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  prefixIcon: const Icon(Icons.group_rounded, color: WhatsAppTheme.primaryTeal),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: 'Deskripsi Komunitas (Opsional)',
+                  hintText: 'Jelaskan tujuan komunitas ini...',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  prefixIcon: const Icon(Icons.description_rounded, color: WhatsAppTheme.primaryTeal),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: const Text('Batal', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: WhatsAppTheme.primaryTeal,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
             onPressed: () async {
               final name = nameCtrl.text.trim();
               Navigator.pop(ctx);
@@ -1399,6 +1465,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       creator: user,
                       members: const [],
                     );
+
+                    // Kirim pesan sambutan pengumuman admin pertama
+                    final desc = descCtrl.text.trim();
+                    await chatService.sendMessage(
+                      chatId: newCommunity.id,
+                      senderId: user.uid,
+                      senderName: user.displayName,
+                      text: '📢 Selamat datang di Komunitas $name! ${desc.isNotEmpty ? "\n\n$desc" : ""}',
+                      type: MessageType.text,
+                    );
+
                     if (context.mounted) {
                       Navigator.push(
                         context,
@@ -1406,21 +1483,29 @@ class _HomeScreenState extends State<HomeScreen> {
                           builder: (_) => ChatScreen(chat: newCommunity),
                         ),
                       );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Komunitas "$name" berhasil dibuat!')),
+                      showPremiumNotificationToast(
+                        context,
+                        title: 'Komunitas Dibuat!',
+                        message: 'Komunitas "$name" berhasil dibuat dan siap mengundang anggota.',
+                        icon: Icons.groups_rounded,
+                        accentColor: WhatsAppTheme.primaryTeal,
                       );
                     }
                   } catch (e) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Gagal membuat komunitas: $e')),
+                      showPremiumNotificationToast(
+                        context,
+                        title: 'Gagal Membuat',
+                        message: 'Terjadi kesalahan: $e',
+                        icon: Icons.error_outline_rounded,
+                        accentColor: const Color(0xFFEF4444),
                       );
                     }
                   }
                 }
               }
             },
-            child: const Text('Create'),
+            child: const Text('Buat Komunitas', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
