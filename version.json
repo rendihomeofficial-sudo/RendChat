@@ -1,8 +1,8 @@
 {
   "version": "1.2.8",
-  "build_number": 11,
-  "release_notes": "Fitur pengiriman media lengkap: Foto (Kamera & Galeri), Video rekaman/galeri, Berkas audio musik, Dokumen (PDF, Word, Excel, ZIP), serta berkas lainnya dengan fallback cloud storage & viewer interaktif.",
-  "download_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/download/v1.2.8/RenChat.apk",
-  "min_supported_version": "1.0.0",
-  "force_update": false
+  "version_code": 11,
+  "title": "RenChat v1.2.8 - Full Media Support: Foto, Video, Audio & Dokumen",
+  "release_notes": "• Pengiriman Video Nyata: Ditambahkan aksi Video Picker untuk merekam langsung atau memilih video dari galeri dengan durasi hingga 5 menit.\n• Pengiriman Audio Musik: Pengguna kini dapat membagikan musik dan rekaman audio berkualitas tinggi.\n• Dokumen & Berkas: Dukungan lengkap untuk PDF, Word, Excel, PowerPoint, dan arsip ZIP.\n• Penyempurnaan Grid Lampiran: Tata letak lembar lampiran 8-grid simetris yang elegan khas WhatsApp.",
+  "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
+  "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
