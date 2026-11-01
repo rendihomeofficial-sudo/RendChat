@@ -1,8 +1,8 @@
 {
-  "version": "1.2.6",
-  "version_code": 9,
-  "title": "RenChat v1.2.6 - Tampilan Premium WhatsApp Modern (Material 3 Pill & Floating Dock)",
-  "release_notes": "• Tampilan Navigasi Premium: Bilah bawah kini mengusung Modern NavigationBar dengan Active Pill Capsule bergradien emerald dan getaran haptic saat beralih tab.\n• Floating Input Dock: Kolom pengetikan pesan kini melayang anggun (floating dock style) dengan sudut melengkung 28px dan tombol aksi kirim/suara berbayang elevasi.\n• Gelembung Quoted Message Elegan: Pratinjau balasan pesan berbingkai melengkung modern dengan bar toska tebal dan ikon balasan.\n• Glow Status Rings: Lingkaran avatar status di tab Updates kini bergradien bercahaya hijau khas WhatsApp untuk pembaruan status baru yang belum ditonton.",
+  "version": "1.2.7",
+  "version_code": 10,
+  "title": "RenChat v1.2.7 - Waveform Voice Notes, QR Barcode Invite & Direktori Pengguna",
+  "release_notes": "• Waveform Audio Berotasi: Voice Note kini menampilkan visualisasi gelombang suara dinamis dengan 34 bilah amplitudo vertikal interaktif yang terisi sesuai detik pemutaran seperti WhatsApp asli.\n• Layanan Scan Barcode & QR Code: Pengguna kini memiliki Kode QR pribadi unik untuk dibagikan, serta tombol Pindai / Masukkan Kode Barcode untuk saling undang dan mulai obrolan instan.\n• Direktori Pengguna Nyata: Layar Pilih Kontak secara transparan menampilkan seluruh daftar pengguna yang telah mendaftar di RenChat lengkap dengan avatar, bio status, dan lencana online.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }

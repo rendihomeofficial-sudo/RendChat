@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import '../theme/whatsapp_theme.dart';
@@ -32,11 +33,22 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
 
   static const List<double> _rateSteps = [1.0, 1.5, 2.0];
 
+  /// Waveform visualizer amplitudes (bar height multipliers)
+  late final List<double> _waveformBars;
+
   @override
   void initState() {
     super.initState();
     _player = AudioPlayer();
     _duration = Duration(seconds: widget.durationSeconds);
+
+    // Generate unique organic waveform bars based on audioUrl hash
+    final rand = Random(widget.audioUrl.hashCode);
+    _waveformBars = List.generate(34, (i) {
+      final base = (sin(i * 0.45) * 0.4 + 0.6);
+      final jitter = (rand.nextDouble() * 0.4 - 0.2);
+      return (base + jitter).clamp(0.2, 1.0);
+    });
 
     _player.onPlayerStateChanged.listen((state) {
       if (mounted) setState(() => _playerState = state);
@@ -97,7 +109,6 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
   Future<void> _seekToFraction(double fraction) async {
     final total = _duration.inMilliseconds;
     if (total <= 0) return;
-    // Belum ada sumber audio yang dimuat, seek akan gagal.
     if (!_sourceLoaded) return;
     final clamped = fraction.clamp(0.0, 1.0);
     final target = Duration(milliseconds: (total * clamped).round());
@@ -150,6 +161,7 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Waveform Audio Notations Bars (WhatsApp Voice Note Visualizer)
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final width = constraints.maxWidth;
@@ -160,19 +172,33 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
                           _handleSeekUpdate(details.localPosition.dx, width),
                       onHorizontalDragUpdate: (details) =>
                           _handleSeekUpdate(details.localPosition.dx, width),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          backgroundColor: Colors.white24,
-                          color: widget.isMe ? Colors.white : WhatsAppTheme.primaryTeal,
-                          minHeight: 4,
+                      child: SizedBox(
+                        height: 28,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: List.generate(_waveformBars.length, (idx) {
+                            final barFraction = (idx + 1) / _waveformBars.length;
+                            final isPassed = barFraction <= progress;
+                            final barHeight = 26.0 * _waveformBars[idx];
+
+                            return Container(
+                              width: 3.0,
+                              height: barHeight.clamp(4.0, 26.0),
+                              decoration: BoxDecoration(
+                                color: isPassed
+                                    ? (widget.isMe ? Colors.white : WhatsAppTheme.primaryTeal)
+                                    : Colors.white24,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            );
+                          }),
                         ),
                       ),
                     );
                   },
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
