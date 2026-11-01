@@ -55,7 +55,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final uid = auth.currentUid;
     if (uid == null) return;
 
-    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 720,
+      maxHeight: 720,
+      imageQuality: 80,
+    );
     if (picked == null) return;
 
     setState(() => _isSaving = true);

@@ -330,6 +330,8 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final picked = await _picker.pickImage(
         source: fromCamera ? ImageSource.camera : ImageSource.gallery,
+        maxWidth: 1440,
+        maxHeight: 1440,
         imageQuality: 75,
       );
       if (picked == null) return;

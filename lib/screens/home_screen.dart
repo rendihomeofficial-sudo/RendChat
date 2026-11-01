@@ -74,7 +74,9 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         picked = await _picker.pickImage(
           source: fromCamera ? ImageSource.camera : ImageSource.gallery,
-          imageQuality: 92, // Kualitas HD tajam jernih
+          maxWidth: 1440,
+          maxHeight: 1440,
+          imageQuality: 82, // Dioptimalkan untuk kejernihan visual & ukuran efisien
         );
       }
       if (picked == null) return;
@@ -120,7 +122,9 @@ class _HomeScreenState extends State<HomeScreen> {
           showPremiumNotificationToast(
             context,
             title: 'Gagal Mengunggah',
-            message: 'Server sedang sibuk. Silakan coba unggah kembali beberapa saat lagi.',
+            message: isVideo
+                ? 'Ukuran video melebihi batas yang didukung server (maks 1 MB). Silakan gunakan video yang lebih pendek.'
+                : 'Ukuran foto melebihi batas server. Silakan coba pilih kembali fotonya.',
             icon: Icons.error_outline_rounded,
             accentColor: const Color(0xFFEF4444),
           );
