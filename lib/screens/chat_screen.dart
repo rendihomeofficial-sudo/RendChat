@@ -528,9 +528,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final res = await FilePicker.pickFiles(type: FileType.audio);
-      if (res == null || res.files.isEmpty) return;
+      if (res.isEmpty) return;
 
-      final file = res.files.first;
+      final file = res.first;
       final fileName = file.name;
 
       setState(() {
