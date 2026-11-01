@@ -1,8 +1,8 @@
 {
-  "version": "1.2.4",
-  "version_code": 7,
-  "title": "RenChat v1.2.4 - Fitur Komunikasi Penuh, Perbaikan Input Keyboard & Status Musik",
-  "release_notes": "• Perbaikan Reload Mengetik: Obrolan kini stabil dan mulus tanpa reload saat mengetik berkat caching persistent Stream di ChatScreen.\n• Pengiriman Media 100% Berhasil: Dukungan Dual-tier Storage (Firebase Storage & Fallback Base64 Data URI) untuk foto, audio, dan file tanpa resiko gagal.\n• Fitur Status WhatsApp Nyata: Mendukung Unggah Foto Kamera/Galeri, Status Video hingga 30 detik, serta Status Musik/Lagu dengan pemutar audio otomatis di StatusViewer.\n• Menu Pengaturan Berfungsi Nyata: Pembersihan cache aplikasi riil, reset statistik jaringan nyata, pemilihan tema wallpaper dinamis, dan salin tautan undangan.\n• Catatan Instalasi: Jika muncul \"paket bentrok\" saat update, copot (uninstall) versi lama di HP terlebih dahulu, lalu instal v1.2.4 ini.",
+  "version": "1.2.5",
+  "version_code": 8,
+  "title": "RenChat v1.2.5 - Fitur Balas & Reaksi Emoji Status Realtime",
+  "release_notes": "• Reaksi & Balas Status WhatsApp: Menambahkan bar 'Balas status...' di bagian bawah StatusViewerScreen dengan pilihan emoji cepat (❤️, 😂, 😮, 😢, 👏, 🔥) dan pesan teks yang langsung terkirim ke obrolan lawan bicara.\n• Penahanan Status Otomatis: Menekan dan menahan layar akan menjeda (pause) timer status dan audio musik, lalu melanjutkannya saat dilepas.\n• Peningkatan Stabilitas: Alur pembukaan chat 1-on-1 terintegrasi langsung saat membalas status.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }

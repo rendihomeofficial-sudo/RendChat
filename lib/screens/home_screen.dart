@@ -794,6 +794,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => StatusViewerScreen(
+                        statusId: latest.id,
+                        userId: currentUser.uid,
                         userName: 'My Status',
                         userAvatar: currentUser.photoURL,
                         statusText: latest.text,
@@ -907,6 +909,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => StatusViewerScreen(
+                          statusId: st.id,
+                          userId: st.userId,
                           userName: st.userName,
                           userAvatar: st.userAvatar,
                           statusText: st.text,
