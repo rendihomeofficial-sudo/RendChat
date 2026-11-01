@@ -1343,17 +1343,26 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildQuotedMessagePreviewBar() {
     final msg = _replyingToMessage!;
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: WhatsAppTheme.darkSurface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: const Border(
-          left: BorderSide(color: WhatsAppTheme.primaryTeal, width: 4),
+          left: BorderSide(color: WhatsAppTheme.primaryTeal, width: 4.5),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
+          const Icon(Icons.reply_rounded, color: WhatsAppTheme.primaryTeal, size: 20),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1428,7 +1437,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildWhatsAppComposeBar(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -1436,14 +1445,21 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   color: WhatsAppTheme.darkSurface,
-                  borderRadius: BorderRadius.circular(25),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.28),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
                 child: _isRecordingVoice
                     ? Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                         child: Row(
                           children: [
-                            const Icon(Icons.fiber_manual_record, color: Colors.red, size: 18),
+                            const Icon(Icons.fiber_manual_record, color: Colors.red, size: 20),
                             const SizedBox(width: 8),
                             Text(
                               'Recording 0:${_recordDurationSeconds.toString().padLeft(2, '0')}',
@@ -1481,7 +1497,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               decoration: const InputDecoration(
                                 hintText: 'Message',
                                 hintStyle: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 16),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
                                 border: InputBorder.none,
                               ),
                               onSubmitted: (_) => _sendMessage(),
@@ -1502,37 +1518,49 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
               ),
             ),
-            const SizedBox(width: 6),
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: _isRecordingVoice ? Colors.red : WhatsAppTheme.primaryTeal,
-              child: _isSending
-                  ? const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.4,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            const SizedBox(width: 8),
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: (_isRecordingVoice ? Colors.red : WhatsAppTheme.primaryTeal).withValues(alpha: 0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: CircleAvatar(
+                radius: 25,
+                backgroundColor: _isRecordingVoice ? Colors.red : WhatsAppTheme.primaryTeal,
+                child: _isSending
+                    ? const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
                         ),
+                      )
+                    : IconButton(
+                        icon: Icon(
+                          _hasInputText
+                              ? Icons.send_rounded
+                              : (_isRecordingVoice ? Icons.stop_rounded : Icons.mic_rounded),
+                          color: Colors.white,
+                          size: 23,
+                        ),
+                        onPressed: _hasInputText
+                            ? _sendMessage
+                            : (_isRecordingVoice ? _stopAndSendRecording : _startRecording),
+                        tooltip: _hasInputText
+                            ? 'Send'
+                            : (_isRecordingVoice ? 'Send Voice Note' : 'Record Voice Note'),
                       ),
-                    )
-                  : IconButton(
-                      icon: Icon(
-                        _hasInputText
-                            ? Icons.send_rounded
-                            : (_isRecordingVoice ? Icons.stop_rounded : Icons.mic_rounded),
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                      onPressed: _hasInputText
-                          ? _sendMessage
-                          : (_isRecordingVoice ? _stopAndSendRecording : _startRecording),
-                      tooltip: _hasInputText
-                          ? 'Send'
-                          : (_isRecordingVoice ? 'Send Voice Note' : 'Record Voice Note'),
-                    ),
+              ),
             ),
           ],
         ),
@@ -1796,30 +1824,39 @@ class _WhatsAppMessageBubble extends StatelessWidget {
               if (message.replyToText != null) ...[
                 Container(
                   margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6),
+                    color: Colors.black.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(8),
                     border: const Border(
-                      left: BorderSide(color: WhatsAppTheme.primaryTeal, width: 3),
+                      left: BorderSide(color: WhatsAppTheme.primaryTeal, width: 3.5),
                     ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        message.replyToSenderName ?? 'Reply',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: WhatsAppTheme.primaryTeal,
-                        ),
+                      Row(
+                        children: [
+                          const Icon(Icons.reply_rounded, size: 12, color: WhatsAppTheme.primaryTeal),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              message.replyToSenderName ?? 'Reply',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: WhatsAppTheme.primaryTeal,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         message.replyToText!,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary),
+                        style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary, height: 1.2),
                       ),
                     ],
                   ),

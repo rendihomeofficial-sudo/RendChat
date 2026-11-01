@@ -237,35 +237,50 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
+          color: WhatsAppTheme.darkSurface,
           border: Border(
             top: BorderSide(
-              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.15),
               width: 0.5,
             ),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentTabIndex,
-          onTap: (index) => setState(() => _currentTabIndex = index),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline_rounded),
-              activeIcon: Icon(Icons.chat_bubble_rounded),
+        child: NavigationBar(
+          selectedIndex: _currentTabIndex,
+          onDestinationSelected: (index) {
+            HapticFeedback.selectionClick();
+            setState(() => _currentTabIndex = index);
+          },
+          backgroundColor: Colors.transparent,
+          indicatorColor: WhatsAppTheme.primaryTeal.withValues(alpha: 0.22),
+          elevation: 0,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.chat_bubble_outline_rounded, color: WhatsAppTheme.darkTextSecondary),
+              selectedIcon: Icon(Icons.chat_bubble_rounded, color: WhatsAppTheme.primaryTeal),
               label: 'Chats',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.update_rounded),
-              activeIcon: Icon(Icons.update_rounded),
+            NavigationDestination(
+              icon: Icon(Icons.update_rounded, color: WhatsAppTheme.darkTextSecondary),
+              selectedIcon: Icon(Icons.update_rounded, color: WhatsAppTheme.primaryTeal),
               label: 'Updates',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.groups_outlined),
-              activeIcon: Icon(Icons.groups_rounded),
+            NavigationDestination(
+              icon: Icon(Icons.groups_outlined, color: WhatsAppTheme.darkTextSecondary),
+              selectedIcon: Icon(Icons.groups_rounded, color: WhatsAppTheme.primaryTeal),
               label: 'Communities',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.call_outlined),
-              activeIcon: Icon(Icons.call_rounded),
+            NavigationDestination(
+              icon: Icon(Icons.call_outlined, color: WhatsAppTheme.darkTextSecondary),
+              selectedIcon: Icon(Icons.call_rounded, color: WhatsAppTheme.primaryTeal),
               label: 'Calls',
             ),
           ],
@@ -881,18 +896,31 @@ class _HomeScreenState extends State<HomeScreen> {
                 final isViewed = st.isViewedBy(currentUser.uid);
                 return ListTile(
                   leading: Container(
-                    padding: const EdgeInsets.all(2.5),
+                    padding: const EdgeInsets.all(2.8),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isViewed ? Colors.white24 : WhatsAppTheme.primaryTeal,
-                        width: 2.2,
-                      ),
+                      gradient: isViewed
+                          ? null
+                          : const LinearGradient(
+                              colors: [Color(0xFF00A884), Color(0xFF25D366), Color(0xFF128C7E)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                      border: isViewed
+                          ? Border.all(color: Colors.white24, width: 2.0)
+                          : null,
                     ),
-                    child: UserAvatar(
-                      name: st.userName,
-                      photoUrl: st.userAvatar,
-                      radius: 22,
+                    child: Container(
+                      padding: const EdgeInsets.all(1.5),
+                      decoration: const BoxDecoration(
+                        color: WhatsAppTheme.darkBg,
+                        shape: BoxShape.circle,
+                      ),
+                      child: UserAvatar(
+                        name: st.userName,
+                        photoUrl: st.userAvatar,
+                        radius: 21,
+                      ),
                     ),
                   ),
                   title: Text(st.userName, style: const TextStyle(fontWeight: FontWeight.bold)),

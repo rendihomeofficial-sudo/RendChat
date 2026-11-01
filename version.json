@@ -1,8 +1,8 @@
 {
-  "version": "1.2.5",
-  "version_code": 8,
-  "title": "RenChat v1.2.5 - Fitur Balas & Reaksi Emoji Status Realtime",
-  "release_notes": "• Reaksi & Balas Status WhatsApp: Menambahkan bar 'Balas status...' di bagian bawah StatusViewerScreen dengan pilihan emoji cepat (❤️, 😂, 😮, 😢, 👏, 🔥) dan pesan teks yang langsung terkirim ke obrolan lawan bicara.\n• Penahanan Status Otomatis: Menekan dan menahan layar akan menjeda (pause) timer status dan audio musik, lalu melanjutkannya saat dilepas.\n• Peningkatan Stabilitas: Alur pembukaan chat 1-on-1 terintegrasi langsung saat membalas status.",
+  "version": "1.2.6",
+  "version_code": 9,
+  "title": "RenChat v1.2.6 - Tampilan Premium WhatsApp Modern (Material 3 Pill & Floating Dock)",
+  "release_notes": "• Tampilan Navigasi Premium: Bilah bawah kini mengusung Modern NavigationBar dengan Active Pill Capsule bergradien emerald dan getaran haptic saat beralih tab.\n• Floating Input Dock: Kolom pengetikan pesan kini melayang anggun (floating dock style) dengan sudut melengkung 28px dan tombol aksi kirim/suara berbayang elevasi.\n• Gelembung Quoted Message Elegan: Pratinjau balasan pesan berbingkai melengkung modern dengan bar toska tebal dan ikon balasan.\n• Glow Status Rings: Lingkaran avatar status di tab Updates kini bergradien bercahaya hijau khas WhatsApp untuk pembaruan status baru yang belum ditonton.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
