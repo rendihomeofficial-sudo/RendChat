@@ -1415,70 +1415,54 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _showBlockConfirmDialog(BuildContext context, ChatService chatService, String currentUid, String otherUid, String contactName) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppTheme.darkSurface,
-        title: Text('Block $contactName?'),
-        content: const Text(
-          'Blocked contacts will no longer be able to call you or send you messages.',
-          style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await chatService.blockUser(currentUserId: currentUid, targetUserId: otherUid);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('$contactName has been blocked')),
-                );
-              }
-            },
-            child: const Text('Block'),
-          ),
-        ],
-      ),
+  Future<void> _showBlockConfirmDialog(BuildContext context, ChatService chatService, String currentUid, String otherUid, String contactName) async {
+    final confirmed = await showPremiumActionConfirmDialog(
+      context,
+      title: 'Blokir $contactName?',
+      message: 'Kontak yang diblokir tidak akan dapat mengirim pesan atau melakukan panggilan ke akun Anda.',
+      confirmLabel: 'Blokir',
+      icon: Icons.block_rounded,
+      accentColor: const Color(0xFFEF4444),
+      isDestructive: true,
     );
+
+    if (confirmed == true) {
+      await chatService.blockUser(currentUserId: currentUid, targetUserId: otherUid);
+      if (context.mounted) {
+        showPremiumNotificationToast(
+          context,
+          title: 'Kontak Diblokir',
+          message: '$contactName telah berhasil diblokir dari daftar obrolan Anda.',
+          icon: Icons.block_rounded,
+          accentColor: const Color(0xFFEF4444),
+        );
+      }
+    }
   }
 
-  void _showUnblockConfirmDialog(BuildContext context, ChatService chatService, String currentUid, String otherUid, String contactName) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppTheme.darkSurface,
-        title: Text('Unblock $contactName?'),
-        content: const Text(
-          'Unblock this contact to start sending messages and making calls again.',
-          style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await chatService.unblockUser(currentUserId: currentUid, targetUserId: otherUid);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('$contactName has been unblocked')),
-                );
-              }
-            },
-            child: const Text('Unblock'),
-          ),
-        ],
-      ),
+  Future<void> _showUnblockConfirmDialog(BuildContext context, ChatService chatService, String currentUid, String otherUid, String contactName) async {
+    final confirmed = await showPremiumActionConfirmDialog(
+      context,
+      title: 'Buka Blokir $contactName?',
+      message: 'Buka blokir kontak ini untuk mulai berkirim pesan dan melakukan panggilan suara/video kembali.',
+      confirmLabel: 'Buka Blokir',
+      icon: Icons.lock_open_rounded,
+      accentColor: WhatsAppTheme.primaryTeal,
+      isDestructive: false,
     );
+
+    if (confirmed == true) {
+      await chatService.unblockUser(currentUserId: currentUid, targetUserId: otherUid);
+      if (context.mounted) {
+        showPremiumNotificationToast(
+          context,
+          title: 'Blokir Dibuka',
+          message: 'Anda sekarang dapat mengirim pesan dan memanggil $contactName.',
+          icon: Icons.check_circle_rounded,
+          accentColor: WhatsAppTheme.primaryTeal,
+        );
+      }
+    }
   }
 
   Widget _buildQuotedMessagePreviewBar() {

@@ -11,6 +11,7 @@ import '../services/app_update_service.dart';
 import '../services/settings_service.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/chat_feedback_widgets.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -610,11 +611,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: const Icon(Icons.lock_open_rounded, size: 16, color: WhatsAppTheme.primaryTeal),
                               label: const Text('Unblock', style: TextStyle(color: WhatsAppTheme.primaryTeal, fontWeight: FontWeight.bold)),
                               onPressed: () async {
-                                await chatService.unblockUser(currentUserId: currentUid, targetUserId: uid);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('$name unblocked')),
-                                  );
+                                final confirmed = await showPremiumActionConfirmDialog(
+                                  context,
+                                  title: 'Buka Blokir $name?',
+                                  message: 'Buka blokir kontak ini untuk mulai berkirim pesan dan melakukan panggilan kembali.',
+                                  confirmLabel: 'Buka Blokir',
+                                  icon: Icons.lock_open_rounded,
+                                  accentColor: WhatsAppTheme.primaryTeal,
+                                  isDestructive: false,
+                                );
+
+                                if (confirmed == true) {
+                                  await chatService.unblockUser(currentUserId: currentUid, targetUserId: uid);
+                                  if (context.mounted) {
+                                    showPremiumNotificationToast(
+                                      context,
+                                      title: 'Blokir Dibuka',
+                                      message: 'Anda sekarang dapat mengirim pesan dan memanggil $name.',
+                                      icon: Icons.check_circle_rounded,
+                                      accentColor: WhatsAppTheme.primaryTeal,
+                                    );
+                                  }
                                 }
                               },
                             ),

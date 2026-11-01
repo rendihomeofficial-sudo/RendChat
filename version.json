@@ -1,8 +1,8 @@
 {
-  "version": "1.2.8",
-  "version_code": 11,
-  "title": "RenChat v1.2.8 - Full Media Support: Foto, Video, Audio & Dokumen",
-  "release_notes": "• Pengiriman Video Nyata: Ditambahkan aksi Video Picker untuk merekam langsung atau memilih video dari galeri dengan durasi hingga 5 menit.\n• Pengiriman Audio Musik: Pengguna kini dapat membagikan musik dan rekaman audio berkualitas tinggi.\n• Dokumen & Berkas: Dukungan lengkap untuk PDF, Word, Excel, PowerPoint, dan arsip ZIP.\n• Penyempurnaan Grid Lampiran: Tata letak lembar lampiran 8-grid simetris yang elegan khas WhatsApp.",
+  "version": "1.2.9",
+  "version_code": 12,
+  "title": "RenChat v1.2.9 - Premium Dynamic Notification Popups & Dialogs",
+  "release_notes": "• Pop-up Notifikasi Mengambang Dinamis (Dynamic Floating Pill): Notifikasi aksi blokir dan buka blokir kini tampil meluncur dari atas dengan gaya glassmorphism, border glowing, dan ikon status mewah.\n• Dialog Aksi Premium: Konfirmasi blokir & unblok hadir dengan kartu elevasi membulat, ikon lencana melingkar, dan tombol aksi bergradien tegas.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
