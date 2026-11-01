@@ -82,7 +82,7 @@ jobs:
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
 
       - name: Build Android Release APK
-        run: flutter build apk --release --build-name=${{ steps.ver.outputs.build_name }} --build-number=${{ steps.ver.outputs.build_number }}
+        run: flutter build apk --release --verbose --build-name=${{ steps.ver.outputs.build_name }} --build-number=${{ steps.ver.outputs.build_number }}
 
       - name: Prepare Artifacts & Calculate Checksum
         run: |
