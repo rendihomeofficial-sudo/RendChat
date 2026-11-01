@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -6,45 +7,67 @@ import 'package:uuid/uuid.dart';
 
 class StorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final _uuid = const Uuid();
 
-  // Upload any file (documents, images, videos, audio, archives) and return public URL
+  // Upload any file (documents, images, videos, audio, archives) and return public URL or fallback Data URI
   Future<String?> uploadChatFile({
     required String chatId,
     String? filePath,
     Uint8List? fileBytes,
     required String originalFileName,
   }) async {
+    final ext = originalFileName.contains('.')
+        ? originalFileName.split('.').last.toLowerCase()
+        : 'bin';
+
+    Uint8List? rawBytes = fileBytes;
+    if (rawBytes == null && filePath != null) {
+      try {
+        rawBytes = await File(filePath).readAsBytes();
+      } catch (e) {
+        debugPrint('Error reading file bytes: $e');
+      }
+    }
+
+    // 1. Coba unggah ke Firebase Storage
     try {
-      final ext = originalFileName.contains('.')
-          ? originalFileName.split('.').last
-          : 'bin';
       final fileName = '${_uuid.v4()}_$originalFileName';
       final ref = _storage.ref().child('chats/$chatId/$fileName');
 
       UploadTask task;
-      if (kIsWeb || fileBytes != null) {
-        if (fileBytes == null) {
-          throw Exception('File bytes required for web upload');
-        }
+      if (kIsWeb || rawBytes != null) {
         task = ref.putData(
-          fileBytes,
+          rawBytes!,
           SettableMetadata(contentType: _guessMime(ext)),
         );
       } else {
-        if (filePath == null) throw Exception('File path is required');
         task = ref.putFile(
-          File(filePath),
+          File(filePath!),
           SettableMetadata(contentType: _guessMime(ext)),
         );
       }
 
-      final snapshot = await task;
-      return await snapshot.ref.getDownloadURL();
+      final snapshot = await task.timeout(const Duration(seconds: 15));
+      final url = await snapshot.ref.getDownloadURL();
+      return url;
     } catch (e) {
-      debugPrint('StorageService upload error: $e');
-      return null;
+      debugPrint('Firebase Storage upload failed, using fallback data storage: $e');
     }
+
+    // 2. Fallback cerdas: Simpan file sebagai Base64 Data URI jika ukuran wajar (< 1MB)
+    // agar foto dan file langsung terkirim dan terlihat oleh penerima tanpa pernah gagal!
+    if (rawBytes != null && rawBytes.length < 1024 * 1024) {
+      try {
+        final mime = _guessMime(ext);
+        final base64String = base64Encode(rawBytes);
+        return 'data:$mime;base64,$base64String';
+      } catch (e) {
+        debugPrint('Fallback base64 encoding error: $e');
+      }
+    }
+
+    return null;
   }
 
   // Upload user profile photo
@@ -53,55 +76,85 @@ class StorageService {
     required String filePath,
     Uint8List? fileBytes,
   }) async {
+    Uint8List? rawBytes = fileBytes;
+    if (rawBytes == null) {
+      try {
+        rawBytes = await File(filePath).readAsBytes();
+      } catch (e) {
+        debugPrint('Error reading avatar file: $e');
+      }
+    }
+
+    // 1. Coba Firebase Storage
     try {
       final ref = _storage.ref().child('users/$uid/avatar.jpg');
       UploadTask task;
-      if (kIsWeb || fileBytes != null) {
-        if (fileBytes == null) throw Exception('File bytes required on web');
-        task = ref.putData(fileBytes, SettableMetadata(contentType: 'image/jpeg'));
+      if (kIsWeb || rawBytes != null) {
+        task = ref.putData(rawBytes!, SettableMetadata(contentType: 'image/jpeg'));
       } else {
         task = ref.putFile(File(filePath), SettableMetadata(contentType: 'image/jpeg'));
       }
-      final snapshot = await task;
+      final snapshot = await task.timeout(const Duration(seconds: 12));
       final url = await snapshot.ref.getDownloadURL();
 
-      // Update user doc photoURL
-      await FirebaseFirestore.instance.collection('users').doc(uid).update({
-        'photoURL': url,
-      });
-
+      await _firestore.collection('users').doc(uid).update({'photoURL': url});
       return url;
     } catch (e) {
-      debugPrint('Avatar upload error: $e');
-      return null;
+      debugPrint('Firebase Storage avatar failed, using fallback: $e');
     }
+
+    // 2. Fallback: Base64 Data URI untuk avatar
+    if (rawBytes != null) {
+      final base64Data = 'data:image/jpeg;base64,${base64Encode(rawBytes)}';
+      await _firestore.collection('users').doc(uid).update({'photoURL': base64Data});
+      return base64Data;
+    }
+
+    return null;
   }
 
-  // Upload status photo or media
+  // Upload status photo or media (mendukung gambar, video, dan audio lagu)
   Future<String?> uploadStatusMedia({
     required String userId,
     required String filePath,
     Uint8List? fileBytes,
     required String fileName,
   }) async {
+    final ext = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : 'jpg';
+
+    Uint8List? rawBytes = fileBytes;
+    if (rawBytes == null) {
+      try {
+        rawBytes = await File(filePath).readAsBytes();
+      } catch (e) {
+        debugPrint('Error reading status media: $e');
+      }
+    }
+
+    // 1. Coba Firebase Storage
     try {
-      final ext = fileName.contains('.') ? fileName.split('.').last : 'jpg';
       final uniqueName = '${_uuid.v4()}_$fileName';
       final ref = _storage.ref().child('statuses/$userId/$uniqueName');
 
       UploadTask task;
-      if (kIsWeb || fileBytes != null) {
-        if (fileBytes == null) throw Exception('File bytes required on web');
-        task = ref.putData(fileBytes, SettableMetadata(contentType: _guessMime(ext)));
+      if (kIsWeb || rawBytes != null) {
+        task = ref.putData(rawBytes!, SettableMetadata(contentType: _guessMime(ext)));
       } else {
         task = ref.putFile(File(filePath), SettableMetadata(contentType: _guessMime(ext)));
       }
-      final snapshot = await task;
+      final snapshot = await task.timeout(const Duration(seconds: 15));
       return await snapshot.ref.getDownloadURL();
     } catch (e) {
-      debugPrint('Status media upload error: $e');
-      return null;
+      debugPrint('Firebase Storage status media failed, using fallback: $e');
     }
+
+    // 2. Fallback: Data URI untuk status gambar / audio pendek
+    if (rawBytes != null && rawBytes.length < 1024 * 1024) {
+      final mime = _guessMime(ext);
+      return 'data:$mime;base64,${base64Encode(rawBytes)}';
+    }
+
+    return null;
   }
 
   String _guessMime(String ext) {
@@ -160,6 +213,10 @@ class StorageService {
         return 'audio/mp4';
       case 'wav':
         return 'audio/wav';
+      case 'aac':
+        return 'audio/aac';
+      case 'ogg':
+        return 'audio/ogg';
       default:
         return 'application/octet-stream';
     }

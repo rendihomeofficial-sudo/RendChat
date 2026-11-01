@@ -7,6 +7,8 @@ class StatusModel {
   final String? userAvatar;
   final String text;
   final String? mediaUrl;
+  final String? musicUrl;
+  final String? musicTitle;
   final int backgroundColor;
   final DateTime createdAt;
   final List<String> viewedBy;
@@ -18,6 +20,8 @@ class StatusModel {
     this.userAvatar,
     required this.text,
     this.mediaUrl,
+    this.musicUrl,
+    this.musicTitle,
     required this.backgroundColor,
     required this.createdAt,
     this.viewedBy = const [],
@@ -35,6 +39,8 @@ class StatusModel {
       userAvatar: data['userAvatar'] as String?,
       text: data['text'] as String? ?? '',
       mediaUrl: data['mediaUrl'] as String?,
+      musicUrl: data['musicUrl'] as String?,
+      musicTitle: data['musicTitle'] as String?,
       backgroundColor: data['backgroundColor'] as int? ?? 0xFF005C4B,
       createdAt: _parseDateTime(data['createdAt']),
       viewedBy: (data['viewedBy'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
@@ -48,6 +54,8 @@ class StatusModel {
       'userAvatar': userAvatar,
       'text': text,
       'mediaUrl': mediaUrl,
+      'musicUrl': musicUrl,
+      'musicTitle': musicTitle,
       'backgroundColor': backgroundColor,
       'createdAt': Timestamp.fromDate(createdAt),
       'viewedBy': viewedBy,

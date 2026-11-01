@@ -1,8 +1,8 @@
 {
-  "version": "1.2.3",
-  "version_code": 6,
-  "title": "RenChat v1.2.3 - Keystore Resmi Permanen & Komunikasi Realtime",
-  "release_notes": "• PENTING: Penandatanganan APK kini telah dikunci permanen menggunakan Keystore Resmi terdaftar di Firebase Console.\n• Bagi pengguna yang mengalami pesan \"paket bentrok\": copot (uninstall) aplikasi versi lama sekali ini saja, lalu instal versi v1.2.3 ini. Seluruh pembaruan di masa depan akan langsung menimpa otomatis tanpa bentrok!\n• Signaling panggilan suara & video terhubung langsung secara realtime via Cloud Firestore.\n• Fitur hapus akun pengguna permanen dari Firestore & Firebase Authentication.\n• Pembuatan komunitas grup obrolan nyata.",
+  "version": "1.2.4",
+  "version_code": 7,
+  "title": "RenChat v1.2.4 - Fitur Komunikasi Penuh, Perbaikan Input Keyboard & Status Musik",
+  "release_notes": "• Perbaikan Reload Mengetik: Obrolan kini stabil dan mulus tanpa reload saat mengetik berkat caching persistent Stream di ChatScreen.\n• Pengiriman Media 100% Berhasil: Dukungan Dual-tier Storage (Firebase Storage & Fallback Base64 Data URI) untuk foto, audio, dan file tanpa resiko gagal.\n• Fitur Status WhatsApp Nyata: Mendukung Unggah Foto Kamera/Galeri, Status Video hingga 30 detik, serta Status Musik/Lagu dengan pemutar audio otomatis di StatusViewer.\n• Menu Pengaturan Berfungsi Nyata: Pembersihan cache aplikasi riil, reset statistik jaringan nyata, pemilihan tema wallpaper dinamis, dan salin tautan undangan.\n• Catatan Instalasi: Jika muncul \"paket bentrok\" saat update, copot (uninstall) versi lama di HP terlebih dahulu, lalu instal v1.2.4 ini.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }

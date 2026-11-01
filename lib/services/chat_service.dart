@@ -594,6 +594,8 @@ class ChatService {
     String? userAvatar,
     required String text,
     String? mediaUrl,
+    String? musicUrl,
+    String? musicTitle,
     required int backgroundColor,
   }) async {
     final docRef = _statusRef.doc();
@@ -604,6 +606,8 @@ class ChatService {
       userAvatar: userAvatar,
       text: text,
       mediaUrl: mediaUrl,
+      musicUrl: musicUrl,
+      musicTitle: musicTitle,
       backgroundColor: backgroundColor,
       createdAt: DateTime.now(),
       viewedBy: [userId],

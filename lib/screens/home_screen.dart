@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isFollowingOfficialChannel = false;
   final ImagePicker _picker = ImagePicker();
 
-  Future<void> _captureAndPostMediaStatus({bool fromCamera = true}) async {
+  Future<void> _captureAndPostMediaStatus({bool fromCamera = true, bool isVideo = false}) async {
     final auth = context.read<AuthService>();
     final chatService = context.read<ChatService>();
     final storageService = context.read<StorageService>();
@@ -63,15 +63,23 @@ class _HomeScreenState extends State<HomeScreen> {
     if (user == null) return;
 
     try {
-      final picked = await _picker.pickImage(
-        source: fromCamera ? ImageSource.camera : ImageSource.gallery,
-        imageQuality: 75,
-      );
+      XFile? picked;
+      if (isVideo) {
+        picked = await _picker.pickVideo(
+          source: fromCamera ? ImageSource.camera : ImageSource.gallery,
+          maxDuration: const Duration(seconds: 30),
+        );
+      } else {
+        picked = await _picker.pickImage(
+          source: fromCamera ? ImageSource.camera : ImageSource.gallery,
+          imageQuality: 75,
+        );
+      }
       if (picked == null) return;
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mengunggah foto status...')),
+        SnackBar(content: Text(isVideo ? 'Mengunggah video status...' : 'Mengunggah foto status...')),
       );
 
       final bytes = await picked.readAsBytes();
@@ -87,14 +95,14 @@ class _HomeScreenState extends State<HomeScreen> {
           userId: user.uid,
           userName: user.displayName,
           userAvatar: user.photoURL,
-          text: '',
+          text: isVideo ? '📹 Video Status' : '',
           mediaUrl: url,
           backgroundColor: 0xFF000000,
         );
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Status foto berhasil dipublikasikan!')),
+            SnackBar(content: Text(isVideo ? 'Status video berhasil dipublikasikan!' : 'Status foto berhasil dipublikasikan!')),
           );
         }
       }
@@ -790,6 +798,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         userAvatar: currentUser.photoURL,
                         statusText: latest.text,
                         mediaUrl: latest.mediaUrl,
+                        musicUrl: latest.musicUrl,
+                        musicTitle: latest.musicTitle,
                         backgroundColor: Color(latest.backgroundColor),
                       ),
                     ),
@@ -810,15 +820,25 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           ListTile(
                             leading: const Icon(Icons.photo_library_rounded, color: WhatsAppTheme.primaryTeal),
-                            title: const Text('Pilih dari Galeri'),
+                            title: const Text('Pilih Foto dari Galeri'),
                             onTap: () {
                               Navigator.pop(ctx);
                               _captureAndPostMediaStatus(fromCamera: false);
                             },
                           ),
                           ListTile(
+                            leading: const Icon(Icons.videocam_rounded, color: WhatsAppTheme.primaryTeal),
+                            title: const Text('Pilih Video Status'),
+                            subtitle: const Text('Unggah video status hingga 30 detik', style: TextStyle(fontSize: 11, color: WhatsAppTheme.darkTextSecondary)),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _captureAndPostMediaStatus(fromCamera: false, isVideo: true);
+                            },
+                          ),
+                          ListTile(
                             leading: const Icon(Icons.edit_rounded, color: WhatsAppTheme.primaryTeal),
-                            title: const Text('Buat Status Teks'),
+                            title: const Text('Buat Status Teks & Lagu'),
+                            subtitle: const Text('Status warna teks dan pilihan musik latar WhatsApp', style: TextStyle(fontSize: 11, color: WhatsAppTheme.darkTextSecondary)),
                             onTap: () {
                               Navigator.pop(ctx);
                               Navigator.push(
@@ -891,6 +911,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           userAvatar: st.userAvatar,
                           statusText: st.text,
                           mediaUrl: st.mediaUrl,
+                          musicUrl: st.musicUrl,
+                          musicTitle: st.musicTitle,
                           backgroundColor: Color(st.backgroundColor),
                         ),
                       ),

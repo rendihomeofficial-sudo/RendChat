@@ -1,6 +1,8 @@
 import 'dart:async';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import '../widgets/universal_image.dart';
+import '../widgets/user_avatar.dart';
 import '../theme/whatsapp_theme.dart';
 
 class StatusViewerScreen extends StatefulWidget {
@@ -8,6 +10,8 @@ class StatusViewerScreen extends StatefulWidget {
   final String? userAvatar;
   final String statusText;
   final String? mediaUrl;
+  final String? musicUrl;
+  final String? musicTitle;
   final Color backgroundColor;
 
   const StatusViewerScreen({
@@ -16,6 +20,8 @@ class StatusViewerScreen extends StatefulWidget {
     this.userAvatar,
     required this.statusText,
     this.mediaUrl,
+    this.musicUrl,
+    this.musicTitle,
     this.backgroundColor = const Color(0xFF005C4B),
   });
 
@@ -26,17 +32,35 @@ class StatusViewerScreen extends StatefulWidget {
 class _StatusViewerScreenState extends State<StatusViewerScreen> {
   double _progress = 0.0;
   Timer? _timer;
+  AudioPlayer? _audioPlayer;
+  bool _isPlayingMusic = false;
 
   @override
   void initState() {
     super.initState();
-    // 5 seconds progress bar like WhatsApp status
-    _timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+    _startPlayback();
+  }
+
+  void _startPlayback() async {
+    // If status contains music, play the audio in background!
+    if (widget.musicUrl != null && widget.musicUrl!.isNotEmpty) {
+      try {
+        _audioPlayer = AudioPlayer();
+        await _audioPlayer?.play(UrlSource(widget.musicUrl!));
+        if (mounted) setState(() => _isPlayingMusic = true);
+      } catch (e) {
+        debugPrint('Error playing status music: $e');
+      }
+    }
+
+    // 6 seconds progress bar like WhatsApp status
+    _timer = Timer.periodic(const Duration(milliseconds: 60), (timer) {
       if (mounted) {
         setState(() {
           _progress += 0.01;
           if (_progress >= 1.0) {
             _timer?.cancel();
+            _stopAudio();
             Navigator.pop(context);
           }
         });
@@ -44,9 +68,18 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
     });
   }
 
+  void _stopAudio() {
+    try {
+      _audioPlayer?.stop();
+      _audioPlayer?.dispose();
+      _audioPlayer = null;
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
+    _stopAudio();
     super.dispose();
   }
 
@@ -60,14 +93,49 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
             // Media or Text
             if (widget.mediaUrl != null && widget.mediaUrl!.isNotEmpty)
               Positioned.fill(
-                child: CachedNetworkImage(
+                child: UniversalImage(
                   imageUrl: widget.mediaUrl!,
                   fit: BoxFit.contain,
-                  placeholder: (_, __) => const Center(
+                  placeholder: const Center(
                     child: CircularProgressIndicator(color: Colors.white),
                   ),
-                  errorWidget: (_, __, ___) => const Center(
+                  errorWidget: const Center(
                     child: Icon(Icons.broken_image, color: Colors.white54, size: 48),
+                  ),
+                ),
+              ),
+
+            // Music Sticker Badge if Status has song attached (WhatsApp-style)
+            if (widget.musicTitle != null && widget.musicTitle!.isNotEmpty)
+              Positioned(
+                top: 70,
+                left: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.music_note_rounded, color: WhatsAppTheme.primaryTeal, size: 16),
+                      const SizedBox(width: 6),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 220),
+                        child: Text(
+                          widget.musicTitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -113,127 +181,62 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
                     ),
 
             // Top Status Bar Header
-            Column(
-              children: [
-                // Animated Progress Bar
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: _progress,
-                      backgroundColor: Colors.white30,
-                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                      minHeight: 3,
-                    ),
+            Positioned(
+              top: 8,
+              left: 12,
+              right: 12,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LinearProgressIndicator(
+                    value: _progress,
+                    backgroundColor: Colors.white30,
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    minHeight: 2.5,
                   ),
-                ),
-
-                // User Info
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: Row(
+                  const SizedBox(height: 8),
+                  Row(
                     children: [
                       IconButton(
                         icon: const Icon(Icons.arrow_back, color: Colors.white),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: WhatsAppTheme.primaryTeal,
-                        child: Text(
-                          widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.userName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                          const Text(
-                            'Today, Just now',
-                            style: TextStyle(color: Colors.white70, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.more_vert, color: Colors.white),
                         onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            builder: (ctx) => SafeArea(
-                              child: Wrap(
-                                children: [
-                                  ListTile(
-                                    leading: const Icon(Icons.share_rounded),
-                                    title: const Text('Share status'),
-                                    onTap: () {
-                                      Navigator.pop(ctx);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Status link copied')),
-                                      );
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(Icons.report_outlined),
-                                    title: const Text('Report status'),
-                                    onTap: () {
-                                      Navigator.pop(ctx);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Thank you, report submitted')),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
+                          _stopAudio();
+                          Navigator.pop(context);
                         },
                       ),
+                      UserAvatar(
+                        name: widget.userName,
+                        photoUrl: widget.userAvatar,
+                        radius: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.userName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const Text(
+                              'Just now',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.more_vert, color: Colors.white),
+                        onPressed: () {},
+                      ),
                     ],
-                  ),
-                ),
-              ],
-            ),
-
-            // Bottom Reply Bar (WhatsApp status reply)
-            Positioned(
-              bottom: 16,
-              left: 16,
-              right: 16,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.black26,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white70),
-                          SizedBox(width: 8),
-                          Text('Reply', style: TextStyle(color: Colors.white70)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  CircleAvatar(
-                    backgroundColor: WhatsAppTheme.primaryTeal,
-                    radius: 22,
-                    child: const Icon(Icons.favorite_border_rounded, color: Colors.white, size: 20),
                   ),
                 ],
               ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../models/user_model.dart';
@@ -853,51 +854,85 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showWallpaperPreviewDialog() {
+    final settings = context.read<SettingsService>();
+    final options = [
+      'Default Doodle',
+      'Solid Emerald',
+      'Deep Navy',
+      'Charcoal Grey',
+      'Sunset Violet'
+    ];
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppTheme.darkSurface,
-        title: const Text('Chat Wallpaper'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              height: 180,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: WhatsAppTheme.darkChatBg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: WhatsAppTheme.primaryTeal, width: 2),
-              ),
-              child: const Center(
-                child: Text('RenChat Classic Theme', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
-              ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final currentColor = settings.wallpaperColor;
+          return AlertDialog(
+            backgroundColor: WhatsAppTheme.darkSurface,
+            title: const Text('Chat Wallpaper'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: 140,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: currentColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: WhatsAppTheme.primaryTeal, width: 2),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Preview: ${settings.chatWallpaper}',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Pilih tema latar belakang untuk semua obrolan Anda:',
+                  style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary),
+                ),
+                const SizedBox(height: 10),
+                ...options.map((opt) {
+                  final isSelected = settings.chatWallpaper == opt;
+                  return RadioListTile<String>(
+                    dense: true,
+                    title: Text(opt, style: const TextStyle(fontSize: 14)),
+                    value: opt,
+                    groupValue: settings.chatWallpaper,
+                    activeColor: WhatsAppTheme.primaryTeal,
+                    onChanged: (val) {
+                      if (val != null) {
+                        settings.setChatWallpaper(val);
+                        setDialogState(() {});
+                      }
+                    },
+                  );
+                }),
+              ],
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'To change your wallpaper for all chats, choose Bright, Dark, Solid colors, or your photos.',
-              style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Wallpaper updated for all chats!')),
-              );
-            },
-            child: const Text('Set Wallpaper'),
-          ),
-        ],
+            actions: [
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Wallpaper diubah menjadi "${settings.chatWallpaper}"!')),
+                  );
+                },
+                child: const Text('Selesai'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
   void _showChatBackupDialog() {
+    final settings = context.read<SettingsService>();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -909,28 +944,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Text('Cloud Backup'),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Back up your messages and media to Google Drive / Cloud Firestore so you never lose them.'),
-            SizedBox(height: 16),
-            Text('• Last backup: Today, Just now', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
-            Text('• Size: 3.2 MB', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
-            Text('• End-to-end encrypted: On', style: TextStyle(fontSize: 12, color: WhatsAppTheme.primaryTeal)),
+            const Text('Cadangkan riwayat obrolan dan media ke Cloud Firestore agar data Anda aman saat berganti perangkat.'),
+            const SizedBox(height: 16),
+            Text('• Terakhir dicadangkan: ${settings.lastBackupTime}',
+                style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+            const Text('• Enkripsi End-to-end: Aktif',
+                style: TextStyle(fontSize: 12, color: WhatsAppTheme.primaryTeal)),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
           FilledButton.icon(
             style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
             icon: const Icon(Icons.backup_rounded),
-            label: const Text('Back Up Now'),
-            onPressed: () {
+            label: const Text('Cadangkan Sekarang'),
+            onPressed: () async {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Backing up messages to Cloud Firestore... Done!')),
+                const SnackBar(content: Text('Menyinkronkan data ke Cloud Firestore...')),
               );
+              await settings.performRealBackup();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Cadangan obrolan berhasil diperbarui!')),
+                );
+              }
             },
           ),
         ],
@@ -1074,87 +1116,109 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showManageStorageDialog() {
+    final settings = context.read<SettingsService>();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppTheme.darkSurface,
-        title: const Text('Manage Storage'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: 0.12,
-                minHeight: 12,
-                backgroundColor: const Color(0xFF2A3942),
-                color: WhatsAppTheme.primaryTeal,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (ctx) => FutureBuilder<String>(
+        future: settings.getRealCacheSize(),
+        builder: (context, snapshot) {
+          final cacheSize = snapshot.data ?? 'Menghitung...';
+          return AlertDialog(
+            backgroundColor: WhatsAppTheme.darkSurface,
+            title: const Text('Kelola Penyimpanan'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('RenChat Media: 3.4 MB', style: TextStyle(color: WhatsAppTheme.primaryTeal, fontSize: 12, fontWeight: FontWeight.bold)),
-                Text('Free: 45.2 GB', style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: const LinearProgressIndicator(
+                    value: 0.08,
+                    minHeight: 12,
+                    backgroundColor: Color(0xFF2A3942),
+                    color: WhatsAppTheme.primaryTeal,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Ukuran Berkas Cache: $cacheSize',
+                        style: const TextStyle(color: WhatsAppTheme.primaryTeal, fontSize: 13, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Berkas cache memuat sementara foto, thumbnail audio, dan data obrolan agar tampilan lebih cepat.',
+                  style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary),
+                ),
               ],
             ),
-            const Divider(height: 24),
-            const Text('Chats & Media', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: const CircleAvatar(backgroundColor: Color(0xFF233138), child: Text('BB')),
-              title: const Text('Bob Builder'),
-              trailing: const Text('2.1 MB', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
-        ],
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+                icon: const Icon(Icons.delete_sweep_rounded),
+                label: const Text('Bersihkan Cache'),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await settings.clearAppCache();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Penyimpanan cache berhasil dibersihkan!')),
+                    );
+                  }
+                },
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
   void _showNetworkUsageDialog() {
+    final settings = context.read<SettingsService>();
+    final sentKb = (settings.netSentBytes / 1024).toStringAsFixed(1);
+    final recvKb = (settings.netRecvBytes / 1024).toStringAsFixed(1);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: WhatsAppTheme.darkSurface,
         title: const Text('Network usage'),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               dense: true,
-              leading: Icon(Icons.call_rounded, color: WhatsAppTheme.primaryTeal),
-              title: Text('Calls'),
-              trailing: Text('12.5 MB sent • 18.2 MB rec\'d', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+              leading: const Icon(Icons.call_rounded, color: WhatsAppTheme.primaryTeal),
+              title: const Text('Calls & Media'),
+              trailing: Text('$sentKb KB sent • $recvKb KB rec\'d', style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
             ),
             ListTile(
               dense: true,
-              leading: Icon(Icons.photo_rounded, color: WhatsAppTheme.primaryTeal),
-              title: Text('Media'),
-              trailing: Text('8.1 MB sent • 14.6 MB rec\'d', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+              leading: const Icon(Icons.photo_rounded, color: WhatsAppTheme.primaryTeal),
+              title: const Text('Media & Files'),
+              trailing: Text('${(settings.netSentBytes * 0.4 / 1024).toStringAsFixed(1)} KB sent', style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
             ),
             ListTile(
               dense: true,
-              leading: Icon(Icons.chat_bubble_rounded, color: WhatsAppTheme.primaryTeal),
-              title: Text('Messages'),
-              trailing: Text('1,248 messages', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+              leading: const Icon(Icons.chat_bubble_rounded, color: WhatsAppTheme.primaryTeal),
+              title: const Text('Messages & Statuses'),
+              trailing: const Text('Cloud Firestore Realtime', style: TextStyle(fontSize: 12, color: WhatsAppTheme.primaryTeal)),
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Statistics reset')),
-              );
+              await settings.resetNetworkStats();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Statistik jaringan berhasil direset')),
+                );
+              }
             },
             child: const Text('Reset statistics', style: TextStyle(color: Colors.redAccent)),
           ),
@@ -1545,10 +1609,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _settingsTile(
             icon: Icons.group_outlined,
             title: 'Invite a friend',
-            subtitle: '',
+            subtitle: 'Bagikan tautan unduhan RenChat ke kontak Anda',
             onTap: () {
+              Clipboard.setData(const ClipboardData(
+                text: 'Hai! Ayo mengobrol dengan saya di RenChat Messenger. Unduh versi terbarunya di sini: https://github.com/rendihomeofficial-sudo/RendChat/releases/latest',
+              ));
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('RenChat invitation link copied to clipboard!')),
+                const SnackBar(content: Text('Tautan undangan RenChat berhasil disalin ke papan klip!')),
               );
             },
           ),

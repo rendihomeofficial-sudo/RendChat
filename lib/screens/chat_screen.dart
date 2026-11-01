@@ -15,12 +15,14 @@ import '../models/message_model.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
+import '../services/settings_service.dart';
 import '../services/storage_service.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/chat_feedback_widgets.dart';
 import '../widgets/poll_creator_dialog.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/voice_note_player_widget.dart';
+import '../widgets/universal_image.dart';
 import 'call_screen.dart';
 import 'contact_info_screen.dart';
 import 'media_gallery_screen.dart';
@@ -69,6 +71,12 @@ class _ChatScreenState extends State<ChatScreen> {
   Timer? _recordTimer;
   String? _recordedFilePath;
 
+  // Cached persistent streams to prevent stream re-creation & reload during typing
+  Stream<List<Message>>? _messagesStream;
+  Stream<List<String>>? _typingStream;
+  Stream<AppUser?>? _otherUserStream;
+  Stream<bool>? _isBlockedStream;
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +86,13 @@ class _ChatScreenState extends State<ChatScreen> {
     final myUid = auth.currentUid;
     if (myUid != null) {
       chatService.markChatAsRead(widget.chat.id, myUid);
+      _messagesStream = chatService.streamMessages(widget.chat.id);
+      _typingStream = chatService.streamTypingUsers(widget.chat.id, myUid);
+      final otherUid = widget.chat.getOtherUserId(myUid);
+      if (otherUid != null) {
+        _otherUserStream = chatService.streamUserProfile(otherUid);
+        _isBlockedStream = chatService.streamIsUserBlocked(currentUserId: myUid, targetUserId: otherUid);
+      }
     }
 
     _scrollController.addListener(_onScrollChanged);
@@ -218,9 +233,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
 
   void _onTextChanged(String text) {
-    setState(() {
-      _hasInputText = text.trim().isNotEmpty;
-    });
+    final hasText = text.trim().isNotEmpty;
+    // Hanya panggil setState jika nilai hasText benar-benar berubah,
+    // untuk mencegah re-render/reload pada setiap penekanan tombol keyboard.
+    if (_hasInputText != hasText) {
+      setState(() {
+        _hasInputText = hasText;
+      });
+    }
 
     final auth = context.read<AuthService>();
     final chatService = context.read<ChatService>();
@@ -228,7 +248,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final myName = auth.appUser?.displayName ?? 'Someone';
     if (myUid == null) return;
 
-    if (text.trim().isNotEmpty && !_isTyping) {
+    if (hasText && !_isTyping) {
       _isTyping = true;
       chatService.setTypingStatus(
         chatId: widget.chat.id,
@@ -239,7 +259,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     _typingDebounce?.cancel();
-    _typingDebounce = Timer(const Duration(seconds: 2), () {
+    _typingDebounce = Timer(const Duration(seconds: 3), () {
       if (_isTyping) {
         _isTyping = false;
         chatService.setTypingStatus(
@@ -879,7 +899,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           )
                         : otherUid != null
                             ? StreamBuilder<AppUser?>(
-                                stream: chatService.streamUserProfile(otherUid),
+                                stream: _otherUserStream ?? chatService.streamUserProfile(otherUid),
                                 builder: (context, snap) {
                                   return UserAvatar(
                                     name: title,
@@ -916,7 +936,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             )
                           else if (otherUid != null)
                             StreamBuilder<AppUser?>(
-                              stream: chatService.streamUserProfile(otherUid),
+                              stream: _otherUserStream ?? chatService.streamUserProfile(otherUid),
                               builder: (context, snap) {
                                 final u = snap.data;
                                 if (u == null) return const SizedBox.shrink();
@@ -997,9 +1017,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   },
                 ),
                 StreamBuilder<bool>(
-                  stream: otherUid != null
+                  stream: _isBlockedStream ?? (otherUid != null
                       ? chatService.streamIsUserBlocked(currentUserId: currentUser.uid, targetUserId: otherUid)
-                      : Stream.value(false),
+                      : Stream.value(false)),
                   builder: (context, blockSnap) {
                     final isBlocked = blockSnap.data ?? (otherUid != null && currentUser.isBlocked(otherUid));
                     return PopupMenuButton<String>(
@@ -1028,14 +1048,12 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
       ),
       body: Container(
-        decoration: const BoxDecoration(
-          color: WhatsAppTheme.darkChatBg,
-        ),
+        color: context.watch<SettingsService>().wallpaperColor,
         child: Column(
           children: [
             // Typing indicator bubble (animated)
             StreamBuilder<List<String>>(
-              stream: chatService.streamTypingUsers(widget.chat.id, currentUser.uid),
+              stream: _typingStream ?? chatService.streamTypingUsers(widget.chat.id, currentUser.uid),
               builder: (context, snap) {
                 final typers = snap.data ?? [];
                 if (typers.isEmpty) return const SizedBox.shrink();
@@ -1065,7 +1083,7 @@ class _ChatScreenState extends State<ChatScreen> {
             // Messages list with WhatsApp E2EE banner at top
             Expanded(
               child: StreamBuilder<List<Message>>(
-                stream: chatService.streamMessages(widget.chat.id),
+                stream: _messagesStream ?? chatService.streamMessages(widget.chat.id),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -1207,7 +1225,7 @@ class _ChatScreenState extends State<ChatScreen> {
             // WhatsApp Compose Bar or Blocked Notice
             if (!widget.chat.isGroup && otherUid != null)
               StreamBuilder<bool>(
-                stream: chatService.streamIsUserBlocked(currentUserId: currentUser.uid, targetUserId: otherUid),
+                stream: _isBlockedStream ?? chatService.streamIsUserBlocked(currentUserId: currentUser.uid, targetUserId: otherUid),
                 builder: (context, blockSnap) {
                   final isBlocked = blockSnap.data ?? currentUser.isBlocked(otherUid);
                   if (isBlocked) {
@@ -1828,9 +1846,9 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                     child: Stack(
                       children: [
-                        CachedNetworkImage(
+                        UniversalImage(
                           imageUrl: message.mediaUrl!,
-                          placeholder: (_, __) => Container(
+                          placeholder: Container(
                             height: 200,
                             width: 250,
                             color: Colors.black26,
@@ -1838,7 +1856,7 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                               child: CircularProgressIndicator(color: WhatsAppTheme.primaryTeal),
                             ),
                           ),
-                          errorWidget: (_, __, ___) => Container(
+                          errorWidget: Container(
                             height: 160,
                             width: 220,
                             color: Colors.black26,
@@ -2354,10 +2372,10 @@ class _WhatsAppMessageBubble extends StatelessWidget {
               panEnabled: true,
               minScale: 0.5,
               maxScale: 4.0,
-              child: CachedNetworkImage(
+              child: UniversalImage(
                 imageUrl: url,
-                placeholder: (_, __) => const CircularProgressIndicator(color: WhatsAppTheme.primaryTeal),
-                errorWidget: (_, __, ___) => const Column(
+                placeholder: const CircularProgressIndicator(color: WhatsAppTheme.primaryTeal),
+                errorWidget: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.broken_image, size: 64, color: Colors.grey),

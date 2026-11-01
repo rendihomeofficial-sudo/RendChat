@@ -1,5 +1,5 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'universal_image.dart';
 
 class UserAvatar extends StatelessWidget {
   final String? photoUrl;
@@ -28,12 +28,12 @@ class UserAvatar extends StatelessWidget {
       backgroundColor: Theme.of(context).colorScheme.primaryContainer,
       child: photoUrl != null && photoUrl!.isNotEmpty
           ? ClipOval(
-              child: CachedNetworkImage(
+              child: UniversalImage(
                 imageUrl: photoUrl!,
                 width: radius * 2,
                 height: radius * 2,
                 fit: BoxFit.cover,
-                placeholder: (context, url) => Text(
+                placeholder: Text(
                   initials,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -41,7 +41,7 @@ class UserAvatar extends StatelessWidget {
                     color: Theme.of(context).colorScheme.onPrimaryContainer,
                   ),
                 ),
-                errorWidget: (context, url, error) => Text(
+                errorWidget: Text(
                   initials,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
