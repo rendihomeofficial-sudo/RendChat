@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/call_model.dart';
 import '../services/auth_service.dart';
@@ -44,6 +46,13 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
+  // Audio tone generator for calling sound
+  AudioPlayer? _ringtonePlayer;
+  Timer? _ringtoneTimer;
+
+  // Standard high-reliability telecom dial-tone frequencies (Google Sound Library)
+  static const String _callingToneUrl = 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg';
+
   @override
   void initState() {
     super.initState();
@@ -57,7 +66,45 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    _startCallingSound();
     _initiateFirestoreCall();
+  }
+
+  void _startCallingSound() {
+    // Only play calling ring-back tone if this device is the caller (originating call)
+    if (widget.existingCallId == null) {
+      _ringtonePlayer = AudioPlayer();
+      _playCallingToneBurst();
+      // Pola nada dering panggil: nada panggil berulang setiap 3.2 detik seperti telepon WhatsApp
+      _ringtoneTimer = Timer.periodic(const Duration(milliseconds: 3200), (t) {
+        if (!_isConnected && mounted) {
+          _playCallingToneBurst();
+        } else {
+          t.cancel();
+        }
+      });
+    }
+  }
+
+  void _playCallingToneBurst() async {
+    if (_isConnected || !mounted) return;
+    try {
+      HapticFeedback.lightImpact();
+      await _ringtonePlayer?.stop();
+      await _ringtonePlayer?.play(UrlSource(_callingToneUrl));
+    } catch (e) {
+      debugPrint('Error playing calling tone: $e');
+    }
+  }
+
+  void _stopCallingSound() {
+    _ringtoneTimer?.cancel();
+    _ringtoneTimer = null;
+    try {
+      _ringtonePlayer?.stop();
+      _ringtonePlayer?.dispose();
+      _ringtonePlayer = null;
+    } catch (_) {}
   }
 
   void _listenCallStatus(String callId) {
@@ -67,11 +114,14 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       if (call == null || !mounted) return;
 
       if (call.status == 'connected' && !_isConnected) {
+        _stopCallingSound();
+        HapticFeedback.mediumImpact();
         setState(() {
           _isConnected = true;
         });
         _startTimer();
       } else if (call.status == 'rejected' || call.status == 'ended' || call.status == 'missed') {
+        _stopCallingSound();
         if (mounted) {
           Navigator.pop(context);
         }
@@ -128,6 +178,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    _stopCallingSound();
     _pulseController.dispose();
     _connectTimer?.cancel();
     _callTimer?.cancel();

@@ -1,8 +1,8 @@
 {
-  "version": "1.3.0",
-  "version_code": 13,
-  "title": "RenChat v1.3.0 - Status Video HD & Foto Anti-Blank",
-  "release_notes": "• Status Video HD Nyata: Dukungan penuh unggah video status hingga 45 detik dengan opsi kamera langsung maupun galeri.\n• Tampilan Pemutar Status Bebas Blank: Menampilkan kartu pemutar video status interaktif dan foto HD dengan zoom pinch-to-zoom tanpa pernah layar kosong (blank).\n• Lembar Pembuat Status Terpadu: Opsi pilihan Foto Kamera HD, Galeri HD, Video HD, dan Status Teks & Musik yang tertata rapi.",
+  "version": "1.3.1",
+  "version_code": 14,
+  "title": "RenChat v1.3.1 - Suara Nada Panggil (Outgoing Calling Ringtone)",
+  "release_notes": "• Nada Panggilan Suara & Video: Menambahkan efek audio dering panggil ritmis (ring-back tone) saat sedang memanggil kontak seperti WhatsApp asli.\n• Haptic Feedback Ritmis: Getaran halus pada setiap dering panggil dan getaran konfirmasi saat panggilan berhasil terhubung.\n• Auto-Stop Audio: Suara dering otomatis berhenti seketika saat lawan bicara mengangkat panggilan atau menutup telepon.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
