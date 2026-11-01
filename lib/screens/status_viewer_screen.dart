@@ -3,6 +3,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/chat_model.dart';
 import '../models/message_model.dart';
 import '../models/user_model.dart';
@@ -268,18 +269,7 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
             children: [
               // Media or Text
               if (widget.mediaUrl != null && widget.mediaUrl!.isNotEmpty)
-                Positioned.fill(
-                  child: UniversalImage(
-                    imageUrl: widget.mediaUrl!,
-                    fit: BoxFit.contain,
-                    placeholder: const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    ),
-                    errorWidget: const Center(
-                      child: Icon(Icons.broken_image, color: Colors.white54, size: 48),
-                    ),
-                  ),
-                ),
+                _buildStatusMediaContent(),
 
               // Music Sticker Badge if Status has song attached (WhatsApp-style)
               if (widget.musicTitle != null && widget.musicTitle!.isNotEmpty)
@@ -450,6 +440,133 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool _isVideoMedia(String url, String text) {
+    if (text.contains('📹 Video') || text.toLowerCase().contains('.mp4')) return true;
+    final lower = url.toLowerCase();
+    return lower.contains('.mp4') ||
+        lower.contains('.mkv') ||
+        lower.contains('.mov') ||
+        lower.contains('video%2f') ||
+        lower.startsWith('data:video/');
+  }
+
+  Widget _buildStatusMediaContent() {
+    final url = widget.mediaUrl!;
+    final isVideo = _isVideoMedia(url, widget.statusText);
+
+    if (isVideo) {
+      return Positioned.fill(
+        child: Container(
+          color: Colors.black,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: WhatsAppTheme.primaryTeal, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.35),
+                        blurRadius: 24,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 54),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Video Status HD',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    widget.statusText.isNotEmpty && widget.statusText != '📹 Video Status'
+                        ? widget.statusText
+                        : 'Ketuk tombol di bawah untuk memutar video dengan kualitas penuh',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: WhatsAppTheme.primaryTeal,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                  label: const Text('Putar Video Sekarang', style: TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: () async {
+                    _pauseStatus();
+                    final uri = Uri.tryParse(url);
+                    if (uri != null && await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Render Gambar Foto HD
+    return Positioned.fill(
+      child: InteractiveViewer(
+        minScale: 1.0,
+        maxScale: 3.5,
+        child: UniversalImage(
+          imageUrl: url,
+          fit: BoxFit.contain,
+          placeholder: const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(color: WhatsAppTheme.primaryTeal, strokeWidth: 2.5),
+                SizedBox(height: 12),
+                Text('Memuat Foto HD...', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              ],
+            ),
+          ),
+          errorWidget: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.broken_image_rounded, color: Colors.white54, size: 56),
+                const SizedBox(height: 10),
+                const Text('Gagal memuat pratinjau media', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(foregroundColor: WhatsAppTheme.primaryTeal),
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  label: const Text('Buka URL Media'),
+                  onPressed: () async {
+                    final uri = Uri.tryParse(url);
+                    if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),

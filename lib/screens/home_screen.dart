@@ -15,6 +15,7 @@ import '../services/storage_service.dart';
 import '../services/lock_chat_passcode_manager.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/chat_feedback_widgets.dart';
 import 'chat_screen.dart';
 import 'contacts_screen.dart';
 import 'new_group_screen.dart';
@@ -67,19 +68,23 @@ class _HomeScreenState extends State<HomeScreen> {
       if (isVideo) {
         picked = await _picker.pickVideo(
           source: fromCamera ? ImageSource.camera : ImageSource.gallery,
-          maxDuration: const Duration(seconds: 30),
+          maxDuration: const Duration(seconds: 45),
         );
       } else {
         picked = await _picker.pickImage(
           source: fromCamera ? ImageSource.camera : ImageSource.gallery,
-          imageQuality: 75,
+          imageQuality: 92, // Kualitas HD tajam jernih
         );
       }
       if (picked == null) return;
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isVideo ? 'Mengunggah video status...' : 'Mengunggah foto status...')),
+      showPremiumNotificationToast(
+        context,
+        title: isVideo ? 'Mengunggah Video HD' : 'Mengunggah Foto HD',
+        message: 'Sedang memproses dan mengunggah status ke server...',
+        icon: isVideo ? Icons.videocam_rounded : Icons.photo_camera_rounded,
+        accentColor: WhatsAppTheme.primaryTeal,
       );
 
       final bytes = await picked.readAsBytes();
@@ -101,19 +106,142 @@ class _HomeScreenState extends State<HomeScreen> {
         );
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(isVideo ? 'Status video berhasil dipublikasikan!' : 'Status foto berhasil dipublikasikan!')),
+          showPremiumNotificationToast(
+            context,
+            title: 'Status Terkirim!',
+            message: isVideo ? 'Status video HD Anda berhasil dipublikasikan.' : 'Status foto HD Anda berhasil dipublikasikan.',
+            icon: Icons.check_circle_rounded,
+            accentColor: WhatsAppTheme.primaryTeal,
+          );
+        }
+      } else {
+        if (mounted) {
+          showPremiumNotificationToast(
+            context,
+            title: 'Gagal Mengunggah',
+            message: 'Server sedang sibuk. Silakan coba unggah kembali beberapa saat lagi.',
+            icon: Icons.error_outline_rounded,
+            accentColor: const Color(0xFFEF4444),
           );
         }
       }
     } catch (e) {
       debugPrint('Error uploading media status: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal membuat status: $e')),
+        showPremiumNotificationToast(
+          context,
+          title: 'Terjadi Kesalahan',
+          message: 'Gagal membuat status: $e',
+          icon: Icons.error_outline_rounded,
+          accentColor: const Color(0xFFEF4444),
         );
       }
     }
+  }
+
+  void _showStatusCreationOptionsSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: WhatsAppTheme.darkSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade600,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Buat Status Baru',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: WhatsAppTheme.primaryTeal, size: 24),
+                ),
+                title: const Text('Ambil Foto Kamera (HD)', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Potret langsung dengan kamera beresolusi tinggi', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _captureAndPostMediaStatus(fromCamera: true, isVideo: false);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFAC44CF).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: Color(0xFFAC44CF), size: 24),
+                ),
+                title: const Text('Pilih Foto dari Galeri (HD)', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Unggah gambar berkualitas jernih tanpa pecah', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _captureAndPostMediaStatus(fromCamera: false, isVideo: false);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE542A3).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.videocam_rounded, color: Color(0xFFE542A3), size: 24),
+                ),
+                title: const Text('Pilih Video Status (HD)', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Rekam atau pilih video hingga 45 detik', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _captureAndPostMediaStatus(fromCamera: false, isVideo: true);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF009DE2).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.edit_note_rounded, color: Color(0xFF009DE2), size: 24),
+                ),
+                title: const Text('Buat Status Teks & Musik', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Status warna teks dan pilihan musik latar WhatsApp', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TextStatusComposerScreen()),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _listenIncomingCalls() {
@@ -343,8 +471,8 @@ class _HomeScreenState extends State<HomeScreen> {
       actions: [
         IconButton(
           icon: const Icon(Icons.camera_alt_outlined),
-          tooltip: 'Camera',
-          onPressed: () => _captureAndPostMediaStatus(fromCamera: true),
+          tooltip: 'Status Media',
+          onPressed: () => _showStatusCreationOptionsSheet(context),
         ),
         IconButton(
           icon: const Icon(Icons.search_rounded),
@@ -445,7 +573,7 @@ class _HomeScreenState extends State<HomeScreen> {
             FloatingActionButton(
               tooltip: 'Add Status',
               child: const Icon(Icons.camera_alt_rounded),
-              onPressed: () => _captureAndPostMediaStatus(fromCamera: true),
+              onPressed: () => _showStatusCreationOptionsSheet(context),
             ),
           ],
         );
@@ -822,52 +950,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   );
                 } else {
-                  showModalBottomSheet(
-                    context: context,
-                    builder: (ctx) => SafeArea(
-                      child: Wrap(
-                        children: [
-                          ListTile(
-                            leading: const Icon(Icons.camera_alt_rounded, color: WhatsAppTheme.primaryTeal),
-                            title: const Text('Ambil Foto Kamera'),
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _captureAndPostMediaStatus(fromCamera: true);
-                            },
-                          ),
-                          ListTile(
-                            leading: const Icon(Icons.photo_library_rounded, color: WhatsAppTheme.primaryTeal),
-                            title: const Text('Pilih Foto dari Galeri'),
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _captureAndPostMediaStatus(fromCamera: false);
-                            },
-                          ),
-                          ListTile(
-                            leading: const Icon(Icons.videocam_rounded, color: WhatsAppTheme.primaryTeal),
-                            title: const Text('Pilih Video Status'),
-                            subtitle: const Text('Unggah video status hingga 30 detik', style: TextStyle(fontSize: 11, color: WhatsAppTheme.darkTextSecondary)),
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _captureAndPostMediaStatus(fromCamera: false, isVideo: true);
-                            },
-                          ),
-                          ListTile(
-                            leading: const Icon(Icons.edit_rounded, color: WhatsAppTheme.primaryTeal),
-                            title: const Text('Buat Status Teks & Lagu'),
-                            subtitle: const Text('Status warna teks dan pilihan musik latar WhatsApp', style: TextStyle(fontSize: 11, color: WhatsAppTheme.darkTextSecondary)),
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const TextStatusComposerScreen()),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  _showStatusCreationOptionsSheet(context);
                 }
               },
             ),
