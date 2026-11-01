@@ -82,7 +82,13 @@ jobs:
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
 
       - name: Build Android Release APK
-        run: flutter build apk --release --verbose --build-name=${{ steps.ver.outputs.build_name }} --build-number=${{ steps.ver.outputs.build_number }}
+        run: |
+          set -e
+          flutter build apk --release --verbose --build-name=${{ steps.ver.outputs.build_name }} --build-number=${{ steps.ver.outputs.build_number }} 2>&1 | tee build_apk.log || {
+            echo "::error::Flutter build failed. Printing last 100 lines of log:"
+            tail -n 100 build_apk.log
+            exit 1
+          }
 
       - name: Prepare Artifacts & Calculate Checksum
         run: |
