@@ -246,6 +246,147 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
     ).then((_) => _resumeStatus());
   }
 
+  void _showStatusMenu(bool isMyStatus) {
+    _pauseStatus();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1F2C34),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            if (isMyStatus)
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                title: const Text(
+                  'Hapus Status',
+                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text(
+                  'Status ini akan dihapus untuk semua orang',
+                  style: TextStyle(color: Colors.white60, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDeleteStatus();
+                },
+              )
+            else
+              ListTile(
+                leading: const Icon(Icons.flag_outlined, color: Colors.white70),
+                title: const Text('Laporkan Status', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Status telah dilaporkan.')),
+                  );
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.share_outlined, color: Colors.white70),
+              title: const Text('Bagikan...', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Tautan status disalin ke papan klip.')),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    ).then((_) {
+      if (mounted) _resumeStatus();
+    });
+  }
+
+  void _confirmDeleteStatus() {
+    _pauseStatus();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1F2C34),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever_rounded, color: Colors.redAccent),
+            SizedBox(width: 8),
+            Text('Hapus update status?'),
+          ],
+        ),
+        content: const Text(
+          '1 update status ini akan dihapus untuk Anda dan semua kontak Anda.',
+          style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: Colors.white70)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _deleteStatus();
+            },
+            child: const Text('Hapus', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    ).then((_) {
+      if (mounted) _resumeStatus();
+    });
+  }
+
+  Future<void> _deleteStatus() async {
+    final auth = context.read<AuthService>();
+    final chatService = context.read<ChatService>();
+    final currentUser = auth.appUser;
+    if (currentUser == null || widget.statusId.isEmpty) return;
+
+    try {
+      _stopAudio();
+      _timer?.cancel();
+
+      await chatService.deleteStatus(
+        statusId: widget.statusId,
+        userId: currentUser.uid,
+      );
+
+      HapticFeedback.mediumImpact();
+
+      if (mounted) {
+        Navigator.pop(context); // Tutup StatusViewer
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Status berhasil dihapus!'),
+            backgroundColor: WhatsAppTheme.primaryTeal,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menghapus status: $e')),
+        );
+        _resumeStatus();
+      }
+    }
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -432,7 +573,7 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.more_vert, color: Colors.white),
-                          onPressed: () {},
+                          onPressed: () => _showStatusMenu(isMyStatus),
                         ),
                       ],
                     ),

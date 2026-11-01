@@ -1,8 +1,8 @@
 {
-  "version": "1.3.2",
-  "version_code": 15,
-  "title": "RenChat v1.3.2 - Fitur Komunitas 100% Berfungsi Nyata",
-  "release_notes": "• Pembuatan Komunitas Tanpa Batas: Memperbaiki aturan keamanan Firestore sehingga pembuatan komunitas baru dapat dilakukan langsung oleh pembuatnya.\n• Tampilan Tab Komunitas Aktif: Komunitas yang dibuat kini otomatis muncul dan tersinkronisasi di tab 'Communities'.\n• Dialog Komunitas Mewah: Dilengkapi input nama, deskripsi komunitas, pesan pengumuman sambutan admin otomatis, dan notifikasi dynamic floating toast.",
+  "version": "1.3.3",
+  "version_code": 16,
+  "title": "RenChat v1.3.3 - Hapus Status & Pengunduh Update Langsung In-App",
+  "release_notes": "• Fitur Hapus Status: Pengguna kini dapat menghapus status sendiri secara instan dengan mengetuk ikon titik tiga (more) di pojok kanan status viewer atau di daftar tab status.\n• Pengunduh Update Langsung di Aplikasi (In-App Downloader): Download pembaruan versi baru langsung di dalam RenChat dengan indikator persentase (progress bar) dan ukuran MB real-time tanpa perlu membuka Chrome.\n• Pemasangan Tanpa Menumpuk File: APK diunduh ke cache sistem dan langsung memicu penginstal bawaan Android (FileProvider) untuk menimpa versi lama secara aman tanpa menghilangkan chat.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }

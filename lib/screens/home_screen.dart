@@ -930,6 +930,116 @@ class _HomeScreenState extends State<HomeScreen> {
                     : 'Tap to add status update',
                 style: const TextStyle(color: WhatsAppTheme.darkTextSecondary),
               ),
+              trailing: myStatuses.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.more_vert, color: WhatsAppTheme.darkTextSecondary),
+                      onPressed: () {
+                        final latest = myStatuses.first;
+                        showModalBottomSheet(
+                          context: context,
+                          backgroundColor: const Color(0xFF1F2C34),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (bCtx) => SafeArea(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  margin: const EdgeInsets.only(top: 10, bottom: 8),
+                                  width: 40,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white24,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                ListTile(
+                                  leading: const Icon(Icons.visibility_outlined, color: WhatsAppTheme.primaryTeal),
+                                  title: const Text('Lihat Status', style: TextStyle(color: Colors.white)),
+                                  onTap: () {
+                                    Navigator.pop(bCtx);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => StatusViewerScreen(
+                                          statusId: latest.id,
+                                          userId: currentUser.uid,
+                                          userName: 'My Status',
+                                          userAvatar: currentUser.photoURL,
+                                          statusText: latest.text,
+                                          mediaUrl: latest.mediaUrl,
+                                          musicUrl: latest.musicUrl,
+                                          musicTitle: latest.musicTitle,
+                                          backgroundColor: Color(latest.backgroundColor),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                ListTile(
+                                  leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                                  title: const Text(
+                                    'Hapus Status',
+                                    style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                                  ),
+                                  onTap: () {
+                                    Navigator.pop(bCtx);
+                                    showDialog(
+                                      context: context,
+                                      builder: (dCtx) => AlertDialog(
+                                        backgroundColor: const Color(0xFF1F2C34),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                        title: const Text('Hapus status?'),
+                                        content: const Text(
+                                          'Update status ini akan dihapus permanen untuk semua orang.',
+                                          style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(dCtx),
+                                            child: const Text('Batal', style: TextStyle(color: Colors.white70)),
+                                          ),
+                                          FilledButton(
+                                            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+                                            onPressed: () async {
+                                              Navigator.pop(dCtx);
+                                              try {
+                                                await chatService.deleteStatus(
+                                                  statusId: latest.id,
+                                                  userId: currentUser.uid,
+                                                );
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text('Status berhasil dihapus!'),
+                                                      backgroundColor: WhatsAppTheme.primaryTeal,
+                                                    ),
+                                                  );
+                                                }
+                                              } catch (e) {
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(content: Text('Gagal menghapus status: $e')),
+                                                  );
+                                                }
+                                              }
+                                            },
+                                            child: const Text('Hapus'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : null,
               onTap: () {
                 if (myStatuses.isNotEmpty) {
                   final latest = myStatuses.first;

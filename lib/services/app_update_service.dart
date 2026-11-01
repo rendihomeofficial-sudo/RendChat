@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/whatsapp_theme.dart';
@@ -38,15 +42,13 @@ class AppUpdateInfo {
   }
 }
 
-/// Menyimpan dan memantau status pembaruan aplikasi.
-///
-/// Diubah menjadi [ChangeNotifier] supaya banner pembaruan di HomeScreen
-/// bisa bereaksi otomatis begitu pemeriksaan selesai, tanpa perlu
-/// memuat ulang halaman.
+/// Menyimpan dan memantau status pembaruan aplikasi serta mengelola download langsung di dalam aplikasi.
 class AppUpdateService extends ChangeNotifier {
   AppUpdateService._();
 
   static final AppUpdateService instance = AppUpdateService._();
+  static const MethodChannel _installerChannel =
+      MethodChannel('com.chat.messenger/app_installer');
 
   static const String _rawManifestUrl =
       'https://raw.githubusercontent.com/rendihomeofficial-sudo/RendChat/main/version.json';
@@ -61,18 +63,24 @@ class AppUpdateService extends ChangeNotifier {
   String _currentVersion = '1.0.0';
   int _currentVersionCode = 1;
 
-  /// Informasi pembaruan yang tersedia (null bila sudah versi terbaru).
+  // Status Download In-App
+  bool _isDownloading = false;
+  double _downloadProgress = 0.0; // 0.0 to 1.0
+  String _downloadStatusText = '';
+  String? _downloadedApkPath;
+
   AppUpdateInfo? get updateInfo => _updateInfo;
-
-  /// True bila ada versi baru yang belum diunduh.
   bool get hasUpdate => _updateInfo != null;
-
   bool get isChecking => _isChecking;
   String? get lastError => _lastError;
   String get currentVersion => _currentVersion;
   int get currentVersionCode => _currentVersionCode;
 
-  /// Membaca versi aplikasi yang benar-benar terpasang (dari package info).
+  bool get isDownloading => _isDownloading;
+  double get downloadProgress => _downloadProgress;
+  String get downloadStatusText => _downloadStatusText;
+  String? get downloadedApkPath => _downloadedApkPath;
+
   Future<void> _loadLocalVersion() async {
     try {
       final info = await PackageInfo.fromPlatform();
@@ -83,21 +91,15 @@ class AppUpdateService extends ChangeNotifier {
     }
   }
 
-  /// Pemeriksaan pembaruan otomatis saat aplikasi dibuka.
-  ///
-  /// Menunda sebentar agar transisi ke HomeScreen tidak terasa berat.
   Future<void> checkUpdateOnStartup() async {
     if (_hasCheckedThisSession) return;
     _hasCheckedThisSession = true;
 
     await _loadLocalVersion();
-
-    // Beri jeda 3 detik setelah home screen terbuka agar transisi halus.
     await Future.delayed(const Duration(seconds: 3));
     await checkUpdate(silentIfUpToDate: true);
   }
 
-  /// Memeriksa pembaruan dari GitHub.
   Future<void> checkUpdate({bool silentIfUpToDate = false}) async {
     if (_isChecking) return;
     _isChecking = true;
@@ -135,7 +137,6 @@ class AppUpdateService extends ChangeNotifier {
   }
 
   Future<AppUpdateInfo?> _fetchLatestVersionInfo() async {
-    // 1. Coba dari raw GitHub version.json
     try {
       final resp = await http
           .get(Uri.parse(_rawManifestUrl))
@@ -144,11 +145,8 @@ class AppUpdateService extends ChangeNotifier {
         final data = json.decode(resp.body) as Map<String, dynamic>;
         return AppUpdateInfo.fromJson(data);
       }
-    } catch (_) {
-      // Lanjut ke fallback.
-    }
+    } catch (_) {}
 
-    // 2. Fallback: coba dari GitHub Releases API
     try {
       final resp = await http
           .get(
@@ -194,7 +192,119 @@ class AppUpdateService extends ChangeNotifier {
     }
   }
 
-  /// Membuka halaman unduhan APK di browser.
+  /// Download langsung di dalam aplikasi dengan progress bar streaming.
+  Future<void> startInAppDownload({
+    required AppUpdateInfo info,
+    required BuildContext context,
+  }) async {
+    if (_isDownloading) return;
+
+    _isDownloading = true;
+    _downloadProgress = 0.0;
+    _downloadStatusText = 'Menghubungi server unduhan...';
+    _downloadedApkPath = null;
+    notifyListeners();
+
+    try {
+      String downloadUrl = info.apkUrl;
+      if (!downloadUrl.toLowerCase().endsWith('.apk')) {
+        // Coba ambil direct download dari GitHub Releases jika url masih link release
+        final latest = await _fetchLatestVersionInfo();
+        if (latest != null && latest.apkUrl.toLowerCase().endsWith('.apk')) {
+          downloadUrl = latest.apkUrl;
+        }
+      }
+
+      final client = http.Client();
+      final request = http.Request('GET', Uri.parse(downloadUrl));
+      final response = await client.send(request);
+
+      if (response.statusCode >= 400) {
+        throw Exception('Server mengembalikan kode status ${response.statusCode}');
+      }
+
+      final contentLength = response.contentLength ?? 0;
+      final tempDir = await getTemporaryDirectory();
+      
+      // Bersihkan APK lama di cache jika ada
+      final oldApks = tempDir.listSync().where((f) => f.path.endsWith('.apk'));
+      for (final old in oldApks) {
+        try {
+          old.deleteSync();
+        } catch (_) {}
+      }
+
+      final saveFile = File('${tempDir.path}/RenChat_v${info.version}.apk');
+      final sink = saveFile.openWrite();
+
+      int received = 0;
+      await response.stream.listen(
+        (chunk) {
+          sink.add(chunk);
+          received += chunk.length;
+          if (contentLength > 0) {
+            _downloadProgress = (received / contentLength).clamp(0.0, 1.0);
+            final percent = (_downloadProgress * 100).toInt();
+            final mbReceived = (received / (1024 * 1024)).toStringAsFixed(1);
+            final mbTotal = (contentLength / (1024 * 1024)).toStringAsFixed(1);
+            _downloadStatusText = '$percent% ($mbReceived MB / $mbTotal MB)';
+          } else {
+            final mbReceived = (received / (1024 * 1024)).toStringAsFixed(1);
+            _downloadStatusText = 'Mengunduh: $mbReceived MB...';
+          }
+          notifyListeners();
+        },
+        cancelOnError: true,
+      ).asFuture();
+
+      await sink.flush();
+      await sink.close();
+      client.close();
+
+      _downloadProgress = 1.0;
+      _downloadStatusText = 'Unduhan selesai! Membuka penginstal...';
+      _downloadedApkPath = saveFile.path;
+      _isDownloading = false;
+      notifyListeners();
+
+      // Panggil penginstal Android
+      await installApk(saveFile.path);
+    } catch (e) {
+      debugPrint('Error downloading update in-app: $e');
+      _isDownloading = false;
+      _downloadStatusText = 'Gagal mengunduh langsung: $e';
+      notifyListeners();
+
+      // Fallback jika direct download gagal, arahkan ke browser
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unduhan in-app terhambat, membuka peramban... ($e)'),
+            action: SnackBarAction(
+              label: 'Buka',
+              onPressed: () => openDownloadPage(info),
+            ),
+          ),
+        );
+        await openDownloadPage(info);
+      }
+    }
+  }
+
+  /// Memanggil Intent Penginstal Android bawaan sistem lewat MethodChannel.
+  Future<bool> installApk(String filePath) async {
+    try {
+      final res = await _installerChannel.invokeMethod<bool>('installApk', {
+        'filePath': filePath,
+      });
+      return res ?? false;
+    } catch (e) {
+      debugPrint('Gagal memicu penginstal APK Android: $e');
+      return false;
+    }
+  }
+
+  /// Membuka halaman unduhan APK di browser (sebagai fallback).
   Future<void> openDownloadPage(AppUpdateInfo info) async {
     final target = Uri.parse(
       info.apkUrl.isNotEmpty ? info.apkUrl : info.fallbackUrl,
@@ -214,7 +324,6 @@ class AppUpdateService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Menutup banner pembaruan tanpa memasang ulang.
   void dismissUpdateBanner() {
     if (_updateInfo == null) return;
     _updateInfo = null;
@@ -242,72 +351,97 @@ class UpdateBanner extends StatelessWidget {
           color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.5),
         ),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.system_update_rounded,
-              color: WhatsAppTheme.primaryTeal,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  info.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: WhatsAppTheme.darkTextPrimary,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.system_update_rounded,
+                  color: WhatsAppTheme.primaryTeal,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      info.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: WhatsAppTheme.darkTextPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      service.isDownloading
+                          ? service.downloadStatusText
+                          : 'Versi ${info.version} tersedia (Anda: v${service.currentVersion})',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: service.isDownloading
+                            ? WhatsAppTheme.primaryTeal
+                            : WhatsAppTheme.darkTextSecondary,
+                        fontWeight: service.isDownloading
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!service.isDownloading)
+                TextButton(
+                  onPressed: () => showUpdateDialog(context),
+                  style: TextButton.styleFrom(
+                    foregroundColor: WhatsAppTheme.primaryTeal,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Perbarui',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Versi ${info.version} tersedia (Anda: v${service.currentVersion})',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: WhatsAppTheme.darkTextSecondary,
-                  ),
-                ),
-              ],
-            ),
+              IconButton(
+                onPressed: service.dismissUpdateBanner,
+                icon: const Icon(Icons.close_rounded, size: 18),
+                color: WhatsAppTheme.darkTextSecondary,
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Tutup',
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => service.openDownloadPage(info),
-            style: TextButton.styleFrom(
-              foregroundColor: WhatsAppTheme.primaryTeal,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              minimumSize: const Size(0, 36),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          if (service.isDownloading) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: service.downloadProgress > 0 ? service.downloadProgress : null,
+                backgroundColor: Colors.white12,
+                valueColor: const AlwaysStoppedAnimation<Color>(WhatsAppTheme.primaryTeal),
+                minHeight: 4,
+              ),
             ),
-            child: const Text(
-              'Perbarui',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-          ),
-          IconButton(
-            onPressed: service.dismissUpdateBanner,
-            icon: const Icon(Icons.close_rounded, size: 18),
-            color: WhatsAppTheme.darkTextSecondary,
-            visualDensity: VisualDensity.compact,
-            tooltip: 'Tutup',
-          ),
+          ],
         ],
       ),
     );
   }
 }
 
-/// Dialog konfirmasi pembaruan manual (dipakai dari ProfileScreen).
+/// Dialog konfirmasi & progress pembaruan in-app.
 Future<void> showUpdateDialog(BuildContext context) async {
   final service = context.read<AppUpdateService>();
   await service.checkUpdate(silentIfUpToDate: true);
@@ -332,150 +466,250 @@ Future<void> showUpdateDialog(BuildContext context) async {
   await showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: WhatsAppTheme.darkSurface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.system_update_rounded,
-              color: WhatsAppTheme.primaryTeal,
-              size: 28,
-            ),
+    builder: (ctx) => Consumer<AppUpdateService>(
+      builder: (context, updateSvc, _) {
+        return AlertDialog(
+          backgroundColor: WhatsAppTheme.darkSurface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.system_update_rounded,
+                  color: WhatsAppTheme.primaryTeal,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Pembaruan RenChat',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Versi v${info.version} (Saat ini: v${updateSvc.currentVersion})',
+                      style: const TextStyle(
+                        color: WhatsAppTheme.darkTextSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
+          content: SingleChildScrollView(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Pembaruan Tersedia!',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'RenChat v${info.version} (Saat ini: v${service.currentVersion})',
-                  style: const TextStyle(
-                    color: WhatsAppTheme.darkTextSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Versi terbaru RenChat telah dirilis di GitHub. Perbarui aplikasi '
-              'untuk mendapatkan fitur baru dan stabilitas terbaik.',
-              style: TextStyle(
-                color: WhatsAppTheme.darkTextSecondary,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1F2C34),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.new_releases_outlined,
-                        size: 16,
-                        color: WhatsAppTheme.primaryTeal,
-                      ),
-                      SizedBox(width: 6),
-                      Text(
-                        'Catatan Perubahan:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          color: WhatsAppTheme.primaryTeal,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    info.releaseNotes,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      height: 1.4,
-                      color: WhatsAppTheme.darkTextPrimary,
+                if (!updateSvc.isDownloading && updateSvc.downloadedApkPath == null) ...[
+                  const Text(
+                    'Pembaruan akan diunduh langsung di dalam aplikasi tanpa perlu '
+                    'membuka browser Chrome, menghemat penyimpanan dan otomatis siap pasang.',
+                    style: TextStyle(
+                      color: WhatsAppTheme.darkTextSecondary,
+                      fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 14),
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                      color: const Color(0xFF1F2C34),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.3),
+                      ),
                     ),
-                    child: const Row(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.info_outline_rounded, size: 16, color: Colors.amber),
-                        SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Catatan: Jika muncul peringatan "paket bentrok" saat menginstal, silakan copot (uninstall) aplikasi versi lama di HP Anda terlebih dahulu.',
-                            style: TextStyle(fontSize: 11, color: Colors.amber, height: 1.3),
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.new_releases_outlined,
+                              size: 16,
+                              color: WhatsAppTheme.primaryTeal,
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'Catatan Pembaruan:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: WhatsAppTheme.primaryTeal,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          info.releaseNotes,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.4,
+                            color: WhatsAppTheme.darkTextPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.3)),
+                          ),
+                          child: const Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.check_circle_outline_rounded, size: 16, color: WhatsAppTheme.primaryTeal),
+                              SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Pemasangan otomatis menimpa versi lama tanpa menghilangkan chat atau riwayat Anda.',
+                                  style: TextStyle(fontSize: 11, color: WhatsAppTheme.primaryTeal, height: 1.3),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
+                ] else if (updateSvc.isDownloading) ...[
+                  // Tampilan Progress Download
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1F2C34),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Mengunduh APK...',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            Text(
+                              '${(updateSvc.downloadProgress * 100).toInt()}%',
+                              style: const TextStyle(
+                                color: WhatsAppTheme.primaryTeal,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: LinearProgressIndicator(
+                            value: updateSvc.downloadProgress > 0 ? updateSvc.downloadProgress : null,
+                            minHeight: 8,
+                            backgroundColor: Colors.white12,
+                            valueColor: const AlwaysStoppedAnimation<Color>(WhatsAppTheme.primaryTeal),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          updateSvc.downloadStatusText,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  // Download Selesai
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: WhatsAppTheme.primaryTeal),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: WhatsAppTheme.primaryTeal, size: 48),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Pembaruan Siap Dipasang!',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Berkas update RenChat v${info.version} telah tersimpan. Ketuk "Pasang Sekarang" untuk menyelesaikan pembaruan.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
+          ),
+          actions: [
+            if (!updateSvc.isDownloading)
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'Batal',
+                  style: TextStyle(color: WhatsAppTheme.darkTextSecondary),
+                ),
+              ),
+            if (!updateSvc.isDownloading && updateSvc.downloadedApkPath == null)
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: WhatsAppTheme.primaryTeal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+                icon: const Icon(Icons.downloading_rounded, size: 18),
+                label: const Text(
+                  'Unduh Langsung',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: () async {
+                  await updateSvc.startInAppDownload(
+                    info: info,
+                    context: context,
+                  );
+                },
+              ),
+            if (updateSvc.downloadedApkPath != null)
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: WhatsAppTheme.primaryTeal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+                icon: const Icon(Icons.install_mobile_rounded, size: 18),
+                label: const Text(
+                  'Pasang Sekarang',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: () async {
+                  await updateSvc.installApk(updateSvc.downloadedApkPath!);
+                },
+              ),
           ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text(
-            'Nanti Saja',
-            style: TextStyle(color: WhatsAppTheme.darkTextSecondary),
-          ),
-        ),
-        FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: WhatsAppTheme.primaryTeal,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          ),
-          icon: const Icon(Icons.download_rounded, size: 18),
-          label: const Text(
-            'Perbarui Sekarang',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          onPressed: () async {
-            Navigator.pop(ctx);
-            await service.openDownloadPage(info);
-          },
-        ),
-      ],
+        );
+      },
     ),
   );
 }

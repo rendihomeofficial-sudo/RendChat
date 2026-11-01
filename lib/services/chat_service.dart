@@ -634,6 +634,21 @@ class ChatService {
     });
   }
 
+  /// Menghapus status pengguna (hanya bisa dihapus oleh pemilik status)
+  Future<void> deleteStatus({
+    required String statusId,
+    required String userId,
+  }) async {
+    final docRef = _firestore.collection('statuses').doc(statusId);
+    final snap = await docRef.get();
+    if (!snap.exists) return;
+    final data = snap.data();
+    if (data != null && data['userId'] != userId) {
+      throw Exception('Anda tidak memiliki izin untuk menghapus status ini.');
+    }
+    await docRef.delete();
+  }
+
   // CALL FEATURES & SIGNALING
   CollectionReference<CallModel> get _callsRef => _firestore
       .collection('calls')
