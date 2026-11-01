@@ -1,8 +1,8 @@
 {
-  "version": "1.2.2",
-  "version_code": 5,
-  "title": "RenChat v1.2.2 - Fitur Komunikasi Nyata & Realtime Call Signaling",
-  "release_notes": "• Panggilan suara & video kini memakai Firestore Realtime Signaling nyata (terhubung saat dijawab, tertutup otomatis saat ditolak/selesai)\n• Fitur Hapus Akun nyata: menghapus dokumen profil Firestore dan akun autentikasi Firebase secara permanen\n• Pembuatan Komunitas nyata: langsung membuat ruang obrolan grup komunitas di Firestore\n• Penambahan suite pengujian otomatis untuk centang biru (read receipt) dan alur obrolan",
+  "version": "1.2.3",
+  "version_code": 6,
+  "title": "RenChat v1.2.3 - Keystore Resmi Permanen & Komunikasi Realtime",
+  "release_notes": "• PENTING: Penandatanganan APK kini telah dikunci permanen menggunakan Keystore Resmi terdaftar di Firebase Console.\n• Bagi pengguna yang mengalami pesan \"paket bentrok\": copot (uninstall) aplikasi versi lama sekali ini saja, lalu instal versi v1.2.3 ini. Seluruh pembaruan di masa depan akan langsung menimpa otomatis tanpa bentrok!\n• Signaling panggilan suara & video terhubung langsung secara realtime via Cloud Firestore.\n• Fitur hapus akun pengguna permanen dari Firestore & Firebase Authentication.\n• Pembuatan komunitas grup obrolan nyata.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }

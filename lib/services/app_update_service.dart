@@ -424,6 +424,28 @@ Future<void> showUpdateDialog(BuildContext context) async {
                       color: WhatsAppTheme.darkTextPrimary,
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 16, color: Colors.amber),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Catatan: Jika muncul peringatan "paket bentrok" saat menginstal, silakan copot (uninstall) aplikasi versi lama di HP Anda terlebih dahulu.',
+                            style: TextStyle(fontSize: 11, color: Colors.amber, height: 1.3),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
