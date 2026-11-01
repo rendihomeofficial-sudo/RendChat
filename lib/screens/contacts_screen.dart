@@ -49,19 +49,42 @@ class _ContactsScreenState extends State<ContactsScreen> {
     }
   }
 
-  void _onSearch() {
-    final q = _searchController.text.trim().toLowerCase();
+  Future<void> _onSearch() async {
+    final q = _searchController.text.trim();
     if (q.isEmpty) {
       setState(() => _filtered = _allContacts);
-    } else {
-      setState(() {
-        _filtered = _allContacts
-            .where((u) =>
-                u.displayName.toLowerCase().contains(q) ||
-                u.email.toLowerCase().contains(q))
-            .toList();
-      });
+      return;
     }
+
+    final lower = q.toLowerCase();
+    final localMatches = _allContacts
+        .where((u) =>
+            u.displayName.toLowerCase().contains(lower) ||
+            u.email.toLowerCase().contains(lower))
+        .toList();
+
+    // Jika pencarian lokal menemukan hasil, tampilkan langsung
+    setState(() => _filtered = localMatches);
+
+    // Sekaligus cari ke Firestore untuk pengguna yang belum masuk cache kontak lokal
+    final auth = context.read<AuthService>();
+    final chatService = context.read<ChatService>();
+    final myUid = auth.currentUid;
+    if (myUid == null) return;
+
+    try {
+      final remoteMatches = await chatService.searchUsers(q, myUid);
+      if (mounted && _searchController.text.trim() == q) {
+        final combinedMap = <String, AppUser>{};
+        for (final u in localMatches) {
+          combinedMap[u.uid] = u;
+        }
+        for (final u in remoteMatches) {
+          combinedMap[u.uid] = u;
+        }
+        setState(() => _filtered = combinedMap.values.toList());
+      }
+    } catch (_) {}
   }
 
   Future<void> _startChatWith(AppUser otherUser) async {

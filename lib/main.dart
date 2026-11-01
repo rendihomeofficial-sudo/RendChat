@@ -10,6 +10,7 @@ import 'services/auth_service.dart';
 import 'services/chat_service.dart';
 import 'services/notification_service.dart';
 import 'services/presence_service.dart';
+import 'services/settings_service.dart';
 import 'services/storage_service.dart';
 import 'theme/whatsapp_theme.dart';
 
@@ -43,18 +44,25 @@ class MessengerApp extends StatelessWidget {
         ChangeNotifierProvider<AppUpdateService>.value(
           value: AppUpdateService.instance,
         ),
+        ChangeNotifierProvider<SettingsService>.value(
+          value: SettingsService.instance,
+        ),
         Provider(create: (_) => ChatService()),
         Provider(create: (_) => StorageService()),
         Provider(create: (_) => PresenceService()),
         Provider(create: (_) => NotificationService()),
       ],
-      child: MaterialApp(
-        title: 'RenChat',
-        debugShowCheckedModeBanner: false,
-        theme: WhatsAppTheme.lightTheme,
-        darkTheme: WhatsAppTheme.darkTheme,
-        themeMode: ThemeMode.dark,
-        home: const AuthGate(),
+      child: Consumer<SettingsService>(
+        builder: (context, settings, _) {
+          return MaterialApp(
+            title: 'RenChat',
+            debugShowCheckedModeBanner: false,
+            theme: WhatsAppTheme.lightTheme,
+            darkTheme: WhatsAppTheme.darkTheme,
+            themeMode: settings.themeMode,
+            home: const AuthGate(),
+          );
+        },
       ),
     );
   }

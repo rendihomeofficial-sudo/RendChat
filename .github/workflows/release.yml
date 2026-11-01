@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag name for release (e.g. v1.1.0)'
+        description: 'Tag name for release (e.g. v1.2.0)'
         required: false
         default: ''
 
@@ -46,24 +46,18 @@ jobs:
       - name: Configure Keystore & Signing Properties
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'RenChatRelease2026!' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'RenChatRelease2026!' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'upload' }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           mkdir -p android/app
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Decoding KEYSTORE_BASE64 from GitHub Secrets..."
-            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-          else
-            echo "KEYSTORE_BASE64 secret not found. Checking if keystore already exists or generating fallback keystore..."
-            if [ ! -f "android/app/upload-keystore.jks" ]; then
-              keytool -genkeypair -v -keystore android/app/upload-keystore.jks \
-                -alias "$KEY_ALIAS" \
-                -keyalg RSA -keysize 2048 -validity 10000 \
-                -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" \
-                -dname "CN=RenChat, OU=Mobile Development, O=RenChat Official, L=Jakarta, ST=DKI Jakarta, C=ID"
-            fi
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_PASSWORD" ] || [ -z "$KEY_ALIAS" ]; then
+            echo "::error::Release signing secrets are missing from repository settings!"
+            exit 1
           fi
+
+          echo "Decoding KEYSTORE_BASE64 from GitHub Secrets..."
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
 
           echo "Generating android/key.properties..."
           cat <<EOF > android/key.properties
@@ -79,8 +73,16 @@ jobs:
       - name: Run Flutter Tests
         run: flutter test
 
+      - name: Read Version Info
+        id: ver
+        run: |
+          BUILD_NAME=$(node -p "require('./version.json').version")
+          BUILD_NUMBER=$(node -p "require('./version.json').version_code")
+          echo "build_name=$BUILD_NAME" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+
       - name: Build Android Release APK
-        run: flutter build apk --release --build-name=1.2.0 --build-number=3
+        run: flutter build apk --release --build-name=${{ steps.ver.outputs.build_name }} --build-number=${{ steps.ver.outputs.build_number }}
 
       - name: Prepare Artifacts & Calculate Checksum
         run: |
@@ -90,10 +92,7 @@ jobs:
             exit 1
           fi
           
-          # Copy to final release name
           cp "$APK_SOURCE" RenChat.apk
-          
-          # Compute sha256
           sha256sum RenChat.apk > RenChat.apk.sha256
           
           echo "Release APK generated successfully:"

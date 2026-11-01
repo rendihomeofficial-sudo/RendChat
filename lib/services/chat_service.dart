@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/chat_model.dart';
 import '../models/message_model.dart';
 import '../models/user_model.dart';
@@ -241,17 +242,43 @@ class ChatService {
     });
   }
 
-  // Mark all unread messages in chat as read
+  // Mark all unread messages in chat as read, and update message readBy
   Future<void> markChatAsRead(String chatId, String currentUserId) async {
-    final chatDoc = await _chatsRef.doc(chatId).get();
-    if (!chatDoc.exists) return;
-    final chat = chatDoc.data()!;
-    if ((chat.unread[currentUserId] ?? 0) == 0) return;
+    try {
+      final chatDoc = await _chatsRef.doc(chatId).get();
+      if (!chatDoc.exists) return;
+      final chat = chatDoc.data()!;
 
-    final newUnread = Map<String, int>.from(chat.unread);
-    newUnread[currentUserId] = 0;
+      if ((chat.unread[currentUserId] ?? 0) > 0) {
+        final newUnread = Map<String, int>.from(chat.unread);
+        newUnread[currentUserId] = 0;
+        await _chatsRef.doc(chatId).update({'unread': newUnread});
+      }
 
-    await _chatsRef.doc(chatId).update({'unread': newUnread});
+      // Mark recent messages as read by current user (for blue check read receipts)
+      final unreadMsgsSnap = await _messagesRef(chatId)
+          .orderBy('createdAt', descending: true)
+          .limit(30)
+          .get();
+
+      final batch = _firestore.batch();
+      bool hasBatchOps = false;
+      for (final doc in unreadMsgsSnap.docs) {
+        final msg = doc.data();
+        if (msg.senderId != currentUserId && !msg.readBy.contains(currentUserId)) {
+          batch.update(doc.reference, {
+            'readBy': FieldValue.arrayUnion([currentUserId]),
+            'status': 'read',
+          });
+          hasBatchOps = true;
+        }
+      }
+      if (hasBatchOps) {
+        await batch.commit();
+      }
+    } catch (e) {
+      debugPrint('Error marking chat as read: $e');
+    }
   }
 
   // Add / toggle reaction on message
@@ -437,12 +464,15 @@ class ChatService {
       await docRef.update({'pinnedBy': pinned});
       return false; // unpinned
     } else {
-      // Check if user already has 3 pinned chats
-      final currentPinnedSnap = await _chatsRef
+      // Check if user already has 3 pinned chats (client-side count over user's chats to avoid composite index requirement)
+      final userChatsSnap = await _chatsRef
           .where('participants', arrayContains: userId)
-          .where('pinnedBy', arrayContains: userId)
           .get();
-      if (currentPinnedSnap.docs.length >= 3) {
+      final currentPinnedCount = userChatsSnap.docs
+          .where((d) => d.data().isPinnedBy(userId))
+          .length;
+
+      if (currentPinnedCount >= 3) {
         throw Exception('You can only pin up to 3 chats');
       }
       pinned.add(userId);

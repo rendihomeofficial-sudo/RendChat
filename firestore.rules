@@ -47,7 +47,6 @@ service cloud.firestore {
                            'photoURL',
                            'participantNames',
                            'participantAvatars',
-                           'participants',
                            'pinnedBy',
                            'archivedBy',
                            'lockedBy'
@@ -66,7 +65,7 @@ service cloud.firestore {
                               .hasOnly(['text', 'editedAt', 'deleted', 'deletedAt', 'mediaUrl']))
                         ||
                         (request.resource.data.diff(resource.data).affectedKeys()
-                              .hasOnly(['reactions', 'readBy', 'deliveryStatus', 'starredBy', 'pollVotes', 'viewedBy']))
+                              .hasOnly(['reactions', 'readBy', 'deliveryStatus', 'status', 'starredBy', 'pollVotes', 'viewedBy']))
                       );
         allow delete: if isChatParticipant(chatId) && resource.data.senderId == request.auth.uid;
       }

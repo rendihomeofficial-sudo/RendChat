@@ -159,8 +159,8 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                       title: const Text('Mute notifications'),
                       trailing: Switch(
                         value: false,
-                        activeColor: WhatsAppTheme.primaryTeal,
-                        activeTrackColor: WhatsAppTheme.primaryTeal.withOpacity(0.5),
+                        activeThumbColor: WhatsAppTheme.primaryTeal,
+                        activeTrackColor: WhatsAppTheme.primaryTeal.withValues(alpha: 0.5),
                         onChanged: (val) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(val ? 'Notifications muted' : 'Notifications unmuted')),
@@ -188,7 +188,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                       ),
                       trailing: Switch(
                         value: _isLocked,
-                        activeColor: WhatsAppTheme.primaryTeal,
+                        activeThumbColor: WhatsAppTheme.primaryTeal,
                         onChanged: (val) async {
                           setState(() {
                             _isLocked = val;

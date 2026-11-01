@@ -7,6 +7,7 @@ import '../services/chat_service.dart';
 import '../services/lock_chat_passcode_manager.dart';
 import '../services/storage_service.dart';
 import '../services/app_update_service.dart';
+import '../services/settings_service.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/user_avatar.dart';
 
@@ -21,13 +22,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _picker = ImagePicker();
   bool _isSaving = false;
 
-  // Settings State (Interactive & Persistent across session)
   String _lastSeenPrivacy = 'Everyone';
   String _profilePhotoPrivacy = 'My contacts';
   String _aboutPrivacy = 'Everyone';
   bool _readReceipts = true;
-
   String _themeMode = 'Dark';
+
+  @override
+  void initState() {
+    super.initState();
+    final settings = SettingsService.instance;
+    _themeMode = settings.themeModeString;
+    _readReceipts = settings.readReceipts;
+    _lastSeenPrivacy = settings.lastSeenPrivacy;
+    _profilePhotoPrivacy = settings.profilePhotoPrivacy;
+    _aboutPrivacy = settings.aboutPrivacy;
+  }
   String _notificationTone = 'RenChat Ding (Default)';
   String _vibrateSetting = 'Default';
   String _lightSetting = 'White';
@@ -229,7 +239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: const TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
                 trailing: Switch(
                   value: _securityNotifications,
-                  activeColor: WhatsAppTheme.primaryTeal,
+                  activeThumbColor: WhatsAppTheme.primaryTeal,
                   onChanged: (val) {
                     setState(() => _securityNotifications = val);
                     setSheetState(() {});
@@ -412,6 +422,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     options: ['Everyone', 'My contacts', 'My contacts except...', 'Nobody'],
                     onSelected: (val) {
                       setState(() => _lastSeenPrivacy = val);
+                      context.read<SettingsService>().setLastSeenPrivacy(val);
                       setSheetState(() {});
                     },
                   );
@@ -428,6 +439,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     options: ['Everyone', 'My contacts', 'Nobody'],
                     onSelected: (val) {
                       setState(() => _profilePhotoPrivacy = val);
+                      context.read<SettingsService>().setProfilePhotoPrivacy(val);
                       setSheetState(() {});
                     },
                   );
@@ -444,6 +456,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     options: ['Everyone', 'My contacts', 'Nobody'],
                     onSelected: (val) {
                       setState(() => _aboutPrivacy = val);
+                      context.read<SettingsService>().setAboutPrivacy(val);
                       setSheetState(() {});
                     },
                   );
@@ -456,9 +469,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
                 trailing: Switch(
                   value: _readReceipts,
-                  activeColor: WhatsAppTheme.primaryTeal,
+                  activeThumbColor: WhatsAppTheme.primaryTeal,
                   onChanged: (val) {
                     setState(() => _readReceipts = val);
+                    context.read<SettingsService>().setReadReceipts(val);
                     setSheetState(() {});
                   },
                 ),
@@ -486,7 +500,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 trailing: Switch(
                   value: LockChatPasscodeManager().hideLockedChatsFolder,
-                  activeColor: WhatsAppTheme.primaryTeal,
+                  activeThumbColor: WhatsAppTheme.primaryTeal,
                   onChanged: (val) {
                     LockChatPasscodeManager().setHideLockedChats(val);
                     setSheetState(() {});
@@ -807,6 +821,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   options: ['System default', 'Light', 'Dark'],
                   onSelected: (val) {
                     setState(() => _themeMode = val);
+                    context.read<SettingsService>().setThemeMode(val);
                   },
                 );
               },
@@ -990,10 +1005,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: const Text('High priority notifications'),
                 subtitle: const Text('Show notification pop-up previews at the top of the screen',
                     style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
-                trailing: Switch(
-                  value: _highPriority,
-                  activeColor: WhatsAppTheme.primaryTeal,
-                  onChanged: (val) {
+              trailing: Switch(
+                value: _highPriority,
+                activeThumbColor: WhatsAppTheme.primaryTeal,
+                onChanged: (val) {
                     setState(() => _highPriority = val);
                     setSheetState(() {});
                   },

@@ -24,6 +24,14 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
+  /// Kecepatan putar aktif (1x, 1.5x, 2x).
+  double _playbackRate = 1.0;
+
+  /// True setelah sumber audio berhasil dimuat (seek baru mungkin dilakukan).
+  bool _sourceLoaded = false;
+
+  static const List<double> _rateSteps = [1.0, 1.5, 2.0];
+
   @override
   void initState() {
     super.initState();
@@ -66,7 +74,45 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
         await _player.seek(Duration.zero);
       }
       await _player.play(UrlSource(widget.audioUrl));
+      if (!mounted) return;
+      _sourceLoaded = true;
+      await _player.setPlaybackRate(_playbackRate);
     }
+  }
+
+  /// Ganti kecepatan putar ke langkah berikutnya (1x -> 1.5x -> 2x -> 1x).
+  Future<void> _cyclePlaybackRate() async {
+    final idx = _rateSteps.indexOf(_playbackRate);
+    final next = _rateSteps[(idx + 1) % _rateSteps.length];
+    if (!mounted) return;
+    setState(() => _playbackRate = next);
+    try {
+      await _player.setPlaybackRate(next);
+    } catch (_) {
+      // Sebagian perangkat tidak mendukung setPlaybackRate.
+    }
+  }
+
+  /// Seek ke posisi tertentu (0..1).
+  Future<void> _seekToFraction(double fraction) async {
+    final total = _duration.inMilliseconds;
+    if (total <= 0) return;
+    // Belum ada sumber audio yang dimuat, seek akan gagal.
+    if (!_sourceLoaded) return;
+    final clamped = fraction.clamp(0.0, 1.0);
+    final target = Duration(milliseconds: (total * clamped).round());
+    try {
+      await _player.seek(target);
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _position = target);
+  }
+
+  void _handleSeekUpdate(double value, double width) {
+    if (width <= 0) return;
+    _seekToFraction((value / width).clamp(0.0, 1.0));
   }
 
   String _formatDuration(Duration d) {
@@ -104,14 +150,27 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    backgroundColor: Colors.white24,
-                    color: widget.isMe ? Colors.white : WhatsAppTheme.primaryTeal,
-                    minHeight: 4,
-                  ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth;
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: (details) => _handleSeekUpdate(details.localPosition.dx, width),
+                      onHorizontalDragStart: (details) =>
+                          _handleSeekUpdate(details.localPosition.dx, width),
+                      onHorizontalDragUpdate: (details) =>
+                          _handleSeekUpdate(details.localPosition.dx, width),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          backgroundColor: Colors.white24,
+                          color: widget.isMe ? Colors.white : WhatsAppTheme.primaryTeal,
+                          minHeight: 4,
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -121,7 +180,24 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
                       isPlaying ? _formatDuration(_position) : _formatDuration(_duration),
                       style: const TextStyle(fontSize: 11, color: WhatsAppTheme.darkTextSecondary),
                     ),
-                    const Icon(Icons.mic_rounded, size: 14, color: WhatsAppTheme.primaryTeal),
+                    GestureDetector(
+                      onTap: _cyclePlaybackRate,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${_playbackRate.toStringAsFixed(_playbackRate % 1 == 0 ? 0 : 1)}x',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: widget.isMe ? Colors.white : WhatsAppTheme.primaryTeal,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ],

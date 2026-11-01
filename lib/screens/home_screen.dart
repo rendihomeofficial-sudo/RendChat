@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -456,7 +457,10 @@ class _HomeScreenState extends State<HomeScreen> {
               final f = _filters[idx];
               final isSelected = _selectedFilter == f;
               return GestureDetector(
-                onTap: () => setState(() => _selectedFilter = f),
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedFilter = f);
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
@@ -662,7 +666,49 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 itemBuilder: (context, index) {
                   final chat = chats[index];
-                  return _WhatsAppChatTile(chat: chat, currentUserId: currentUser.uid);
+                  // Swipe untuk mengarsipkan chat, seperti di WhatsApp.
+                  return Dismissible(
+                    key: ValueKey('chat_tile_${chat.id}'),
+                    direction: DismissDirection.startToEnd,
+                    background: Container(
+                      color: WhatsAppTheme.darkSurface,
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.only(left: 24),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.archive_rounded, color: WhatsAppTheme.primaryTeal),
+                          SizedBox(width: 8),
+                          Text(
+                            'Archive',
+                            style: TextStyle(
+                              color: WhatsAppTheme.primaryTeal,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    confirmDismiss: (_) async {
+                      HapticFeedback.mediumImpact();
+                      final archived = await chatService.toggleArchiveChat(
+                        chatId: chat.id,
+                        userId: currentUser.uid,
+                      );
+                      if (!context.mounted) return false;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            archived ? 'Chat archived' : 'Chat unarchived',
+                          ),
+                        ),
+                      );
+                      return false; // daftar di-stream ulang oleh Firestore
+                    },
+                    child: _WhatsAppChatTile(
+                      chat: chat,
+                      currentUserId: currentUser.uid,
+                    ),
+                  );
                 },
               );
             },
@@ -1235,6 +1281,7 @@ class _WhatsAppChatTile extends StatelessWidget {
     final isPinned = chat.isPinnedBy(currentUserId);
 
     void showChatActions(BuildContext context) {
+      HapticFeedback.mediumImpact();
       showModalBottomSheet(
         context: context,
         backgroundColor: WhatsAppTheme.darkSurface,

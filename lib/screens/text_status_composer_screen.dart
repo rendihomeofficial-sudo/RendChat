@@ -116,7 +116,7 @@ class _TextStatusComposerScreenState extends State<TextStatusComposerScreen> {
                         userName: user.displayName,
                         userAvatar: user.photoURL,
                         text: text,
-                        backgroundColor: currentColor.value,
+                        backgroundColor: currentColor.toARGB32(),
                       );
                     }
                     if (context.mounted) {

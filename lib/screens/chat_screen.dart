@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -16,6 +17,7 @@ import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../services/storage_service.dart';
 import '../theme/whatsapp_theme.dart';
+import '../widgets/chat_feedback_widgets.dart';
 import '../widgets/poll_creator_dialog.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/voice_note_player_widget.dart';
@@ -43,6 +45,15 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _hasInputText = false;
   bool _isViewOnceSelected = false;
 
+  /// True selagi pesan sedang dikirim (menonaktifkan tombol kirim).
+  bool _isSending = false;
+
+  /// True saat pengguna menggulir jauh dari pesan terbaru.
+  bool _showScrollToBottom = false;
+
+  /// Jumlah pesan terakhir yang dirender, dipakai untuk deteksi pesan baru.
+  int _lastMessageCount = 0;
+
   // Swipe-to-Reply quoted message state
   Message? _replyingToMessage;
 
@@ -68,6 +79,26 @@ class _ChatScreenState extends State<ChatScreen> {
     if (myUid != null) {
       chatService.markChatAsRead(widget.chat.id, myUid);
     }
+
+    _scrollController.addListener(_onScrollChanged);
+  }
+
+  void _onScrollChanged() {
+    if (!_scrollController.hasClients) return;
+    // ListView memakai reverse: true, jadi offset 0 = pesan terbaru.
+    final farFromBottom = _scrollController.offset > 120;
+    if (farFromBottom != _showScrollToBottom) {
+      setState(() => _showScrollToBottom = farFromBottom);
+    }
+  }
+
+  void _scrollToLatest() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
@@ -75,6 +106,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _recordTimer?.cancel();
     _audioRecorder.dispose();
     _typingDebounce?.cancel();
+    _scrollController.removeListener(_onScrollChanged);
     _textController.dispose();
     _scrollController.dispose();
     _searchController.dispose();
@@ -234,19 +266,30 @@ class _ChatScreenState extends State<ChatScreen> {
     _onTextChanged('');
     setState(() {
       _replyingToMessage = null;
+      _isSending = true;
     });
 
-    await chatService.sendMessage(
-      chatId: widget.chat.id,
-      senderId: user.uid,
-      senderName: user.displayName,
-      text: text,
-      type: MessageType.text,
-      replyToId: reply?.id,
-      replyToSenderName: reply?.senderName,
-      replyToText: reply != null ? _getReplyPreviewText(reply) : null,
-      replyToType: reply?.type,
-    );
+    HapticFeedback.lightImpact();
+
+    try {
+      await chatService.sendMessage(
+        chatId: widget.chat.id,
+        senderId: user.uid,
+        senderName: user.displayName,
+        text: text,
+        type: MessageType.text,
+        replyToId: reply?.id,
+        replyToSenderName: reply?.senderName,
+        replyToText: reply != null ? _getReplyPreviewText(reply) : null,
+        replyToType: reply?.type,
+      );
+      HapticFeedback.mediumImpact();
+      _scrollToLatest();
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
   }
 
   String _getReplyPreviewText(Message msg) {
@@ -570,6 +613,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     return InkWell(
                       borderRadius: BorderRadius.circular(20),
                       onTap: () {
+                        HapticFeedback.selectionClick();
                         _textController.text += em;
                         _onTextChanged(_textController.text);
                       },
@@ -989,23 +1033,31 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         child: Column(
           children: [
-            // Typing indicator banner
+            // Typing indicator bubble (animated)
             StreamBuilder<List<String>>(
               stream: chatService.streamTypingUsers(widget.chat.id, currentUser.uid),
               builder: (context, snap) {
                 final typers = snap.data ?? [];
                 if (typers.isEmpty) return const SizedBox.shrink();
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  color: WhatsAppTheme.darkSurface,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  color: WhatsAppTheme.darkChatBg,
                   width: double.infinity,
-                  child: Text(
-                    '${typers.join(', ')} typing...',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      color: WhatsAppTheme.primaryTeal,
-                    ),
+                  child: Row(
+                    children: [
+                      const TypingIndicatorBubble(),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          '${typers.join(', ')} typing...',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: WhatsAppTheme.primaryTeal,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -1028,46 +1080,93 @@ class _ChatScreenState extends State<ChatScreen> {
                               (m.fileName?.toLowerCase().contains(_searchQuery) ?? false))
                           .toList();
 
-                  return ListView.builder(
-                    reverse: true,
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    itemCount: messages.length + 1, // +1 for E2EE Banner
-                    itemBuilder: (context, index) {
-                      if (index == messages.length) {
-                        return _buildE2EEBanner();
-                      }
-                      final msg = messages[index];
-                      final isMe = msg.senderId == currentUser.uid;
-                      return Dismissible(
-                        key: ValueKey('swipe_${msg.id}'),
-                        direction: DismissDirection.startToEnd,
-                        confirmDismiss: (direction) async {
-                          // Swipe to reply action
-                          setState(() {
-                            _replyingToMessage = msg;
-                          });
-                          return false; // don't delete
+                  // Deteksi pesan baru: scroll ke bawah hanya jika pengguna
+                  // sedang berada di posisi teratas (tidak sedang membaca riwayat lama).
+                  if (messages.length > _lastMessageCount) {
+                    final wasAtBottom = !_showScrollToBottom;
+                    _lastMessageCount = messages.length;
+                    if (wasAtBottom) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) _scrollToLatest();
+                      });
+                    }
+                  } else if (messages.length < _lastMessageCount) {
+                    _lastMessageCount = messages.length;
+                  }
+
+                  return Stack(
+                    children: [
+                      ListView.builder(
+                        reverse: true,
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        itemCount: messages.length + 1, // +1 for E2EE Banner
+                        itemBuilder: (context, index) {
+                          if (index == messages.length) {
+                            return _buildE2EEBanner();
+                          }
+                          final msg = messages[index];
+                          final isMe = msg.senderId == currentUser.uid;
+                          return Dismissible(
+                            key: ValueKey('swipe_${msg.id}'),
+                            direction: DismissDirection.startToEnd,
+                            confirmDismiss: (direction) async {
+                              // Swipe to reply action
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _replyingToMessage = msg;
+                              });
+                              return false; // don't delete
+                            },
+                            background: Container(
+                              alignment: Alignment.centerLeft,
+                              padding: const EdgeInsets.only(left: 20),
+                              child: const Icon(Icons.reply_rounded, color: WhatsAppTheme.primaryTeal, size: 28),
+                            ),
+                            child: _WhatsAppMessageBubble(
+                              message: msg,
+                              isMe: isMe,
+                              isGroup: widget.chat.isGroup,
+                              currentUserId: currentUser.uid,
+                              chatId: widget.chat.id,
+                              onReply: () {
+                                setState(() {
+                                  _replyingToMessage = msg;
+                                });
+                              },
+                            ),
+                          );
                         },
-                        background: Container(
-                          alignment: Alignment.centerLeft,
-                          padding: const EdgeInsets.only(left: 20),
-                          child: const Icon(Icons.reply_rounded, color: WhatsAppTheme.primaryTeal, size: 28),
+                      ),
+                      // Tombol scroll ke pesan terbaru
+                      Positioned(
+                        right: 12,
+                        bottom: 12,
+                        child: AnimatedSlide(
+                          offset: _showScrollToBottom ? Offset.zero : const Offset(0, 1.6),
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          child: AnimatedOpacity(
+                            opacity: _showScrollToBottom ? 1 : 0,
+                            duration: const Duration(milliseconds: 220),
+                            child: IgnorePointer(
+                              ignoring: !_showScrollToBottom,
+                              child: FloatingActionButton.small(
+                                heroTag: 'scroll_to_bottom',
+                                backgroundColor: WhatsAppTheme.darkSurface,
+                                foregroundColor: WhatsAppTheme.primaryTeal,
+                                elevation: 3,
+                                onPressed: () {
+                                  HapticFeedback.selectionClick();
+                                  _scrollToLatest();
+                                },
+                                child: const Icon(Icons.keyboard_double_arrow_down_rounded),
+                              ),
+                            ),
+                          ),
                         ),
-                        child: _WhatsAppMessageBubble(
-                          message: msg,
-                          isMe: isMe,
-                          isGroup: widget.chat.isGroup,
-                          currentUserId: currentUser.uid,
-                          chatId: widget.chat.id,
-                          onReply: () {
-                            setState(() {
-                              _replyingToMessage = msg;
-                            });
-                          },
-                        ),
-                      );
-                    },
+                      ),
+                    ],
                   );
                 },
               ),
@@ -1389,21 +1488,33 @@ class _ChatScreenState extends State<ChatScreen> {
             CircleAvatar(
               radius: 24,
               backgroundColor: _isRecordingVoice ? Colors.red : WhatsAppTheme.primaryTeal,
-              child: IconButton(
-                icon: Icon(
-                  _hasInputText
-                      ? Icons.send_rounded
-                      : (_isRecordingVoice ? Icons.stop_rounded : Icons.mic_rounded),
-                  color: Colors.white,
-                  size: 22,
-                ),
-                onPressed: _hasInputText
-                    ? _sendMessage
-                    : (_isRecordingVoice ? _stopAndSendRecording : _startRecording),
-                tooltip: _hasInputText
-                    ? 'Send'
-                    : (_isRecordingVoice ? 'Send Voice Note' : 'Record Voice Note'),
-              ),
+              child: _isSending
+                  ? const Padding(
+                      padding: EdgeInsets.all(14),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                    )
+                  : IconButton(
+                      icon: Icon(
+                        _hasInputText
+                            ? Icons.send_rounded
+                            : (_isRecordingVoice ? Icons.stop_rounded : Icons.mic_rounded),
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                      onPressed: _hasInputText
+                          ? _sendMessage
+                          : (_isRecordingVoice ? _stopAndSendRecording : _startRecording),
+                      tooltip: _hasInputText
+                          ? 'Send'
+                          : (_isRecordingVoice ? 'Send Voice Note' : 'Record Voice Note'),
+                    ),
             ),
           ],
         ),
@@ -1447,6 +1558,7 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                 return InkWell(
                   onTap: () {
                     Navigator.pop(ctx);
+                    HapticFeedback.selectionClick();
                     context.read<ChatService>().toggleReaction(
                           chatId: chatId,
                           messageId: message.id,
@@ -1468,8 +1580,37 @@ class _WhatsAppMessageBubble extends StatelessWidget {
     );
   }
 
+  /// Double-tap pesan memberi reaksi cepat hati, seperti di WhatsApp.
+  void _handleDoubleTap(BuildContext context, Offset globalPosition) {
+    HapticFeedback.mediumImpact();
+
+    // Double-tap hanya menambah reaksi, tidak menghapus reaksi yang sudah ada.
+    if (message.reactions[currentUserId] != '❤️') {
+      context.read<ChatService>().toggleReaction(
+            chatId: chatId,
+            messageId: message.id,
+            userId: currentUserId,
+            emoji: '❤️',
+          );
+    }
+
+    showHeartBurst(context, globalPosition);
+  }
+
+  /// Ketuk badge reaksi untuk menambahkan/melepas reaksi yang sama.
+  void _toggleBadgeReaction(BuildContext context, String emoji) {
+    HapticFeedback.selectionClick();
+    context.read<ChatService>().toggleReaction(
+          chatId: chatId,
+          messageId: message.id,
+          userId: currentUserId,
+          emoji: emoji,
+        );
+  }
+
   void _showOptions(BuildContext context) {
     final isStarred = message.isStarredBy(currentUserId);
+    HapticFeedback.selectionClick();
     showModalBottomSheet(
       context: context,
       backgroundColor: WhatsAppTheme.darkSurface,
@@ -1508,6 +1649,21 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                       );
                 },
               ),
+              if (!message.deleted && message.type == MessageType.text)
+                ListTile(
+                  leading: const Icon(Icons.copy_rounded),
+                  title: const Text('Copy'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Clipboard.setData(ClipboardData(text: message.text));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Pesan disalin'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
               if (isMe && !message.deleted && message.type == MessageType.text)
                 ListTile(
                   leading: const Icon(Icons.edit_outlined),
@@ -1580,10 +1736,15 @@ class _WhatsAppMessageBubble extends StatelessWidget {
     final timeStr = DateFormat('h:mm a').format(message.createdAt);
     final isStarred = message.isStarredBy(currentUserId);
 
+    // Posisi tap pertama pada double-tap, dipakai untuk menempatkan animasi hati.
+    var doubleTapPosition = Offset.zero;
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
         onLongPress: () => _showOptions(context),
+        onDoubleTapDown: (details) => doubleTapPosition = details.globalPosition,
+        onDoubleTap: () => _handleDoubleTap(context, doubleTapPosition),
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 2.5),
           constraints: BoxConstraints(
@@ -1818,11 +1979,7 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                   ),
                   if (isMe) ...[
                     const SizedBox(width: 4),
-                    const Icon(
-                      Icons.done_all_rounded,
-                      size: 15,
-                      color: WhatsAppTheme.blueCheck,
-                    ),
+                    _buildDeliveryStatusIcon(message),
                   ],
                 ],
               ),
@@ -1830,7 +1987,7 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 4,
-                  children: _buildReactionBadges(),
+                  children: _buildReactionBadges(context),
                 ),
               ],
             ],
@@ -1876,6 +2033,7 @@ class _WhatsAppMessageBubble extends StatelessWidget {
 
             return InkWell(
               onTap: () {
+                HapticFeedback.selectionClick();
                 context.read<ChatService>().votePoll(
                       chatId: chatId,
                       messageId: message.id,
@@ -2043,7 +2201,7 @@ class _WhatsAppMessageBubble extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildReactionBadges() {
+  List<Widget> _buildReactionBadges(BuildContext context) {
     final counts = <String, int>{};
     for (final emoji in message.reactions.values) {
       counts[emoji] = (counts[emoji] ?? 0) + 1;
@@ -2054,19 +2212,22 @@ class _WhatsAppMessageBubble extends StatelessWidget {
       final count = entry.value;
       final iReacted = message.reactions[currentUserId] == emoji;
 
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: iReacted ? WhatsAppTheme.darkSurface : WhatsAppTheme.darkPill,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: iReacted ? WhatsAppTheme.primaryTeal : Colors.transparent,
-            width: 1,
+      return GestureDetector(
+        onTap: () => _toggleBadgeReaction(context, emoji),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: iReacted ? WhatsAppTheme.darkSurface : WhatsAppTheme.darkPill,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: iReacted ? WhatsAppTheme.primaryTeal : Colors.transparent,
+              width: 1,
+            ),
           ),
-        ),
-        child: Text(
-          '$emoji $count',
-          style: const TextStyle(fontSize: 11),
+          child: Text(
+            '$emoji $count',
+            style: const TextStyle(fontSize: 11),
+          ),
         ),
       );
     }).toList();
@@ -2124,6 +2285,45 @@ class _WhatsAppMessageBubble extends StatelessWidget {
           const SnackBar(content: Text('Cannot open this file URL')),
         );
       }
+    }
+  }
+
+  Widget _buildDeliveryStatusIcon(Message msg) {
+    final isRead = msg.readBy.any((uid) => uid != currentUserId) || msg.status == DeliveryStatus.read;
+
+    if (isRead) {
+      return const Icon(
+        Icons.done_all_rounded,
+        size: 15,
+        color: WhatsAppTheme.blueCheck,
+      );
+    }
+
+    switch (msg.status) {
+      case DeliveryStatus.sending:
+        return const Icon(
+          Icons.access_time_rounded,
+          size: 13,
+          color: WhatsAppTheme.greyCheck,
+        );
+      case DeliveryStatus.sent:
+        return const Icon(
+          Icons.done_rounded,
+          size: 15,
+          color: WhatsAppTheme.greyCheck,
+        );
+      case DeliveryStatus.delivered:
+        return const Icon(
+          Icons.done_all_rounded,
+          size: 15,
+          color: WhatsAppTheme.greyCheck,
+        );
+      case DeliveryStatus.read:
+        return const Icon(
+          Icons.done_all_rounded,
+          size: 15,
+          color: WhatsAppTheme.blueCheck,
+        );
     }
   }
 
