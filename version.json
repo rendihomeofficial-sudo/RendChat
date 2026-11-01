@@ -1,8 +1,8 @@
 {
-  "version": "1.2.7",
-  "version_code": 10,
-  "title": "RenChat v1.2.7 - Waveform Voice Notes, QR Barcode Invite & Direktori Pengguna",
-  "release_notes": "• Waveform Audio Berotasi: Voice Note kini menampilkan visualisasi gelombang suara dinamis dengan 34 bilah amplitudo vertikal interaktif yang terisi sesuai detik pemutaran seperti WhatsApp asli.\n• Layanan Scan Barcode & QR Code: Pengguna kini memiliki Kode QR pribadi unik untuk dibagikan, serta tombol Pindai / Masukkan Kode Barcode untuk saling undang dan mulai obrolan instan.\n• Direktori Pengguna Nyata: Layar Pilih Kontak secara transparan menampilkan seluruh daftar pengguna yang telah mendaftar di RenChat lengkap dengan avatar, bio status, dan lencana online.",
-  "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
-  "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
+  "version": "1.2.8",
+  "build_number": 11,
+  "release_notes": "Fitur pengiriman media lengkap: Foto (Kamera & Galeri), Video rekaman/galeri, Berkas audio musik, Dokumen (PDF, Word, Excel, ZIP), serta berkas lainnya dengan fallback cloud storage & viewer interaktif.",
+  "download_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/download/v1.2.8/RenChat.apk",
+  "min_supported_version": "1.0.0",
+  "force_update": false
 }

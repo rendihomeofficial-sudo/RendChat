@@ -454,6 +454,137 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _pickAndSendVideo({bool fromCamera = false}) async {
+    final auth = context.read<AuthService>();
+    final chatService = context.read<ChatService>();
+    final storageService = context.read<StorageService>();
+    final user = auth.appUser;
+    if (user == null) return;
+
+    try {
+      final picked = await _picker.pickVideo(
+        source: fromCamera ? ImageSource.camera : ImageSource.gallery,
+        maxDuration: const Duration(minutes: 5),
+      );
+      if (picked == null) return;
+
+      setState(() {
+        _isUploading = true;
+        _uploadStatus = 'Mengunggah video...';
+      });
+
+      final bytes = await picked.readAsBytes();
+      final size = await picked.length();
+      final url = await storageService.uploadChatFile(
+        chatId: widget.chat.id,
+        filePath: picked.path,
+        fileBytes: bytes,
+        originalFileName: picked.name,
+      );
+
+      if (url != null) {
+        final reply = _replyingToMessage;
+        setState(() {
+          _replyingToMessage = null;
+        });
+
+        await chatService.sendMessage(
+          chatId: widget.chat.id,
+          senderId: user.uid,
+          senderName: user.displayName,
+          text: '📹 Video: ${picked.name}',
+          type: MessageType.file,
+          mediaUrl: url,
+          fileName: picked.name,
+          fileSize: size,
+          replyToId: reply?.id,
+          replyToSenderName: reply?.senderName,
+          replyToText: reply != null ? _getReplyPreviewText(reply) : null,
+          replyToType: reply?.type,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengunggah video: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+          _uploadStatus = '';
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndSendAudioFile() async {
+    final auth = context.read<AuthService>();
+    final chatService = context.read<ChatService>();
+    final storageService = context.read<StorageService>();
+    final user = auth.appUser;
+    if (user == null) return;
+
+    try {
+      final res = await FilePicker.pickFiles(type: FileType.audio);
+      if (res == null || res.files.isEmpty) return;
+
+      final file = res.files.first;
+      final fileName = file.name;
+
+      setState(() {
+        _isUploading = true;
+        _uploadStatus = 'Mengunggah audio $fileName...';
+      });
+
+      final bytes = await file.xFile.readAsBytes();
+      final size = await file.xFile.length();
+
+      final url = await storageService.uploadChatFile(
+        chatId: widget.chat.id,
+        filePath: file.path,
+        fileBytes: bytes,
+        originalFileName: fileName,
+      );
+
+      if (url != null) {
+        final reply = _replyingToMessage;
+        setState(() {
+          _replyingToMessage = null;
+        });
+
+        await chatService.sendMessage(
+          chatId: widget.chat.id,
+          senderId: user.uid,
+          senderName: user.displayName,
+          text: '🎵 Audio: $fileName',
+          type: MessageType.file,
+          mediaUrl: url,
+          fileName: fileName,
+          fileSize: size,
+          replyToId: reply?.id,
+          replyToSenderName: reply?.senderName,
+          replyToText: reply != null ? _getReplyPreviewText(reply) : null,
+          replyToType: reply?.type,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengunggah audio: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+          _uploadStatus = '';
+        });
+      }
+    }
+  }
+
   void _sendSimulatedVoiceNote() async {
     final auth = context.read<AuthService>();
     final chatService = context.read<ChatService>();
@@ -737,12 +868,21 @@ class _ChatScreenState extends State<ChatScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _attachmentItem(
+                    icon: Icons.videocam_rounded,
+                    label: 'Video',
+                    color: const Color(0xFFE542A3),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _pickAndSendVideo(fromCamera: false);
+                    },
+                  ),
+                  _attachmentItem(
                     icon: Icons.headphones_rounded,
                     label: 'Audio',
                     color: WhatsAppTheme.attachAudio,
                     onTap: () {
                       Navigator.pop(ctx);
-                      _sendSimulatedVoiceNote();
+                      _pickAndSendAudioFile();
                     },
                   ),
                   _attachmentItem(
@@ -764,6 +904,12 @@ class _ChatScreenState extends State<ChatScreen> {
                       );
                     },
                   ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   _attachmentItem(
                     icon: Icons.person_rounded,
                     label: 'Contact',
@@ -783,12 +929,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       );
                     },
                   ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
                   _attachmentItem(
                     icon: Icons.poll_rounded,
                     label: 'Poll',
@@ -798,6 +938,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       _openPollCreator(context);
                     },
                   ),
+                  const SizedBox(width: 75), // Spacer agar grid tetap simetris
                 ],
               ),
             ],
