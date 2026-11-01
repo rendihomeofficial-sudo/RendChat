@@ -73,11 +73,11 @@ class StorageService {
   // Upload user profile photo
   Future<String?> uploadAvatar({
     required String uid,
-    required String filePath,
+    String? filePath,
     Uint8List? fileBytes,
   }) async {
     Uint8List? rawBytes = fileBytes;
-    if (rawBytes == null) {
+    if (rawBytes == null && filePath != null) {
       try {
         rawBytes = await File(filePath).readAsBytes();
       } catch (e) {
@@ -91,8 +91,10 @@ class StorageService {
       UploadTask task;
       if (kIsWeb || rawBytes != null) {
         task = ref.putData(rawBytes!, SettableMetadata(contentType: 'image/jpeg'));
-      } else {
+      } else if (filePath != null) {
         task = ref.putFile(File(filePath), SettableMetadata(contentType: 'image/jpeg'));
+      } else {
+        return null;
       }
       final snapshot = await task.timeout(const Duration(seconds: 12));
       final url = await snapshot.ref.getDownloadURL();
@@ -116,14 +118,14 @@ class StorageService {
   // Upload status photo or media (mendukung gambar, video, dan audio lagu)
   Future<String?> uploadStatusMedia({
     required String userId,
-    required String filePath,
+    String? filePath,
     Uint8List? fileBytes,
     required String fileName,
   }) async {
     final ext = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : 'jpg';
 
     Uint8List? rawBytes = fileBytes;
-    if (rawBytes == null) {
+    if (rawBytes == null && filePath != null) {
       try {
         rawBytes = await File(filePath).readAsBytes();
       } catch (e) {
@@ -139,8 +141,10 @@ class StorageService {
       UploadTask task;
       if (kIsWeb || rawBytes != null) {
         task = ref.putData(rawBytes!, SettableMetadata(contentType: _guessMime(ext)));
-      } else {
+      } else if (filePath != null) {
         task = ref.putFile(File(filePath), SettableMetadata(contentType: _guessMime(ext)));
+      } else {
+        return null;
       }
       final snapshot = await task.timeout(const Duration(seconds: 15));
       return await snapshot.ref.getDownloadURL();
