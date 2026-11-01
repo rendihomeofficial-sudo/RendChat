@@ -1,8 +1,8 @@
 {
-  "version": "1.2.1",
-  "version_code": 4,
-  "title": "RenChat v1.2.1 - Perbaikan Bug, Status Media & Signing Release Stabil",
-  "release_notes": "• Perbaikan indikator centang biru (read receipt) dan pembacaan pesan secara realtime\n• Penelusuran kontak kini langsung mencari ke direktori pengguna Firestore\n• Penyimpanan preferensi tema (Light/Dark/System) & setelan privasi permanen\n• Pengunggahan media status/story WhatsApp kini tersinkronisasi aman\n• Keystore release resmi baru terdaftar di Firebase untuk Google Sign-In tanpa error\n• Pembatasan maksimal pin chat (3) dihitung aman tanpa memerlukan composite index",
+  "version": "1.2.2",
+  "version_code": 5,
+  "title": "RenChat v1.2.2 - Fitur Komunikasi Nyata & Realtime Call Signaling",
+  "release_notes": "• Panggilan suara & video kini memakai Firestore Realtime Signaling nyata (terhubung saat dijawab, tertutup otomatis saat ditolak/selesai)\n• Fitur Hapus Akun nyata: menghapus dokumen profil Firestore dan akun autentikasi Firebase secara permanen\n• Pembuatan Komunitas nyata: langsung membuat ruang obrolan grup komunitas di Firestore\n• Penambahan suite pengujian otomatis untuk centang biru (read receipt) dan alur obrolan",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }

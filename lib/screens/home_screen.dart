@@ -52,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  bool _isFollowingOfficialChannel = false;
   final ImagePicker _picker = ImagePicker();
 
   Future<void> _captureAndPostMediaStatus({bool fromCamera = true}) async {
@@ -340,8 +341,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 MaterialPageRoute(builder: (_) => const NewGroupScreen()),
               );
             } else if (value == 'new_broadcast') {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('New broadcast list created')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ContactsScreen()),
               );
             } else if (value == 'linked_devices') {
               _showLinkedDevicesDialog(context);
@@ -920,18 +922,30 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               title: const Text('RenChat Official', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Welcome to RenChat Channels! Get updates on new features.'),
-              trailing: OutlinedButton(
+              trailing: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: WhatsAppTheme.primaryTeal,
+                  foregroundColor: _isFollowingOfficialChannel ? Colors.white : WhatsAppTheme.primaryTeal,
+                  backgroundColor: _isFollowingOfficialChannel ? WhatsAppTheme.primaryTeal : null,
                   side: const BorderSide(color: WhatsAppTheme.primaryTeal),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 ),
+                icon: Icon(
+                  _isFollowingOfficialChannel ? Icons.check_rounded : Icons.add_rounded,
+                  size: 16,
+                ),
                 onPressed: () {
+                  setState(() => _isFollowingOfficialChannel = !_isFollowingOfficialChannel);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Subscribed to RenChat Official Channel')),
+                    SnackBar(
+                      content: Text(
+                        _isFollowingOfficialChannel
+                            ? 'Berhasil mengikuti Saluran Resmi RenChat!'
+                            : 'Berhenti mengikuti Saluran Resmi RenChat',
+                      ),
+                    ),
                   );
                 },
-                child: const Text('Follow'),
+                label: Text(_isFollowingOfficialChannel ? 'Following' : 'Follow'),
               ),
             ),
           ],
@@ -1234,13 +1248,39 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
-            onPressed: () {
+            onPressed: () async {
               final name = nameCtrl.text.trim();
               Navigator.pop(ctx);
               if (name.isNotEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Community "$name" successfully created!')),
-                );
+                final auth = context.read<AuthService>();
+                final chatService = context.read<ChatService>();
+                final user = auth.appUser;
+                if (user != null) {
+                  try {
+                    final newCommunity = await chatService.createGroupChat(
+                      title: '🌐 $name',
+                      creator: user,
+                      members: const [],
+                    );
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatScreen(chat: newCommunity),
+                        ),
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Komunitas "$name" berhasil dibuat!')),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Gagal membuat komunitas: $e')),
+                      );
+                    }
+                  }
+                }
               }
             },
             child: const Text('Create'),

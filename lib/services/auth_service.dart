@@ -229,4 +229,40 @@ class AuthService extends ChangeNotifier {
       await _fetchAppUser(_firebaseUser!.uid);
     }
   }
+
+  /// Menghapus akun pengguna sepenuhnya secara nyata dari Firestore & Firebase Auth
+  Future<void> deleteAccount() async {
+    final user = _firebaseUser;
+    if (user == null) return;
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // 1. Hapus dokumen profil pengguna di Firestore
+      await _firestore.collection('users').doc(user.uid).delete();
+    } catch (e) {
+      debugPrint('Gagal menghapus dokumen pengguna di Firestore: $e');
+    }
+
+    try {
+      // 2. Putuskan Google Sign-In
+      if (!kIsWeb) {
+        await GoogleSignIn.instance.signOut();
+      }
+    } catch (_) {}
+
+    try {
+      // 3. Hapus akun Firebase Auth
+      await user.delete();
+    } catch (e) {
+      debugPrint('Gagal menghapus user di Firebase Auth: $e');
+      // Jika butuh re-autentikasi, logout agar aman
+      await _auth.signOut();
+    }
+
+    _firebaseUser = null;
+    _appUser = null;
+    _isLoading = false;
+    notifyListeners();
+  }
 }

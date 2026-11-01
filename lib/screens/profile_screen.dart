@@ -382,11 +382,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              Navigator.pop(context); // Tutup Settings
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Account deletion cancelled: protected by admin')),
+                const SnackBar(content: Text('Menghapus akun Anda...')),
               );
+              await context.read<AuthService>().deleteAccount();
             },
             child: const Text('Delete Account'),
           ),

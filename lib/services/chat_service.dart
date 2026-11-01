@@ -707,5 +707,17 @@ class ChatService {
       return CallModel.fromFirestore(snap.docs.first, null);
     });
   }
+
+  // Stream status call tertentu secara realtime (untuk Caller & Receiver)
+  Stream<CallModel?> streamCall(String callId) {
+    return _firestore
+        .collection('calls')
+        .doc(callId)
+        .snapshots()
+        .map((snap) {
+      if (!snap.exists) return null;
+      return CallModel.fromFirestore(snap, null);
+    });
+  }
 }
 

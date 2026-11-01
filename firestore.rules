@@ -20,7 +20,7 @@ service cloud.firestore {
       allow update: if isSelf(uid)
                     && request.resource.data.diff(resource.data).affectedKeys()
                          .hasOnly(['displayName', 'photoURL', 'online', 'lastSeen', 'fcmTokens', 'statusMessage', 'blockedUsers']);
-      allow delete: if false;
+      allow delete: if isSelf(uid);
 
       match /devices/{deviceId} {
         allow read: if isSignedIn();

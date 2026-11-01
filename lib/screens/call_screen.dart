@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/call_model.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../theme/whatsapp_theme.dart';
@@ -36,6 +37,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   int _callSeconds = 0;
   Timer? _callTimer;
   Timer? _connectTimer;
+  StreamSubscription<CallModel?>? _callStatusSub;
   String? _activeCallId;
 
   // Pulse ring animation
@@ -56,24 +58,35 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     );
 
     _initiateFirestoreCall();
+  }
 
-    // Realistic WhatsApp call connection simulation (Ringing -> Connected)
-    _connectTimer = Timer(const Duration(milliseconds: 2200), () {
-      if (mounted) {
+  void _listenCallStatus(String callId) {
+    _callStatusSub?.cancel();
+    final chatService = context.read<ChatService>();
+    _callStatusSub = chatService.streamCall(callId).listen((call) {
+      if (call == null || !mounted) return;
+
+      if (call.status == 'connected' && !_isConnected) {
         setState(() {
           _isConnected = true;
         });
-        _updateCallConnected();
         _startTimer();
+      } else if (call.status == 'rejected' || call.status == 'ended' || call.status == 'missed') {
+        if (mounted) {
+          Navigator.pop(context);
+        }
       }
     });
   }
 
   Future<void> _initiateFirestoreCall() async {
-    if (widget.existingCallId != null) return;
+    final chatService = context.read<ChatService>();
+    if (widget.existingCallId != null) {
+      _listenCallStatus(widget.existingCallId!);
+      return;
+    }
     if (widget.receiverId != null) {
       final auth = context.read<AuthService>();
-      final chatService = context.read<ChatService>();
       final currentUser = auth.appUser;
       if (currentUser != null) {
         final id = await chatService.initiateCall(
@@ -86,13 +99,10 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
           isVideo: widget.isVideo,
         );
         _activeCallId = id;
+        if (mounted) {
+          _listenCallStatus(id);
+        }
       }
-    }
-  }
-
-  void _updateCallConnected() {
-    if (_activeCallId != null) {
-      context.read<ChatService>().updateCallStatus(_activeCallId!, 'connected');
     }
   }
 
@@ -121,6 +131,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     _pulseController.dispose();
     _connectTimer?.cancel();
     _callTimer?.cancel();
+    _callStatusSub?.cancel();
     super.dispose();
   }
 
