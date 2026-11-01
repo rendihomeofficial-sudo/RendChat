@@ -92,12 +92,18 @@ jobs:
 
       - name: Prepare Artifacts & Calculate Checksum
         run: |
-          APK_SOURCE="build/app/outputs/flutter-apk/app-release.apk"
-          if [ ! -f "$APK_SOURCE" ]; then
-            echo "Error: app-release.apk not found!"
+          echo "Listing all generated APK files:"
+          find build/ -name "*.apk" || true
+
+          APK_SOURCE=$(find build/ -name "*.apk" ! -name "*unaligned*" ! -name "*uncompressed*" 2>/dev/null | head -n 1 || true)
+
+          if [ -z "$APK_SOURCE" ] || [ ! -f "$APK_SOURCE" ]; then
+            echo "Error: release APK not found in build directory!"
+            find build/ -type f || true
             exit 1
           fi
           
+          echo "Found APK at: $APK_SOURCE"
           cp "$APK_SOURCE" RenChat.apk
           sha256sum RenChat.apk > RenChat.apk.sha256
           
