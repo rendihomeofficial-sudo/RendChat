@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../models/chat_model.dart';
 import '../models/user_model.dart';
 import '../models/status_model.dart';
+import '../models/message_model.dart';
 import '../models/call_model.dart';
 import '../services/app_update_service.dart';
 import '../services/auth_service.dart';
