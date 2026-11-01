@@ -1,8 +1,8 @@
 {
-  "version": "1.3.3",
-  "version_code": 16,
-  "title": "RenChat v1.3.3 - Hapus Status & Pengunduh Update Langsung In-App",
-  "release_notes": "• Fitur Hapus Status: Pengguna kini dapat menghapus status sendiri secara instan dengan mengetuk ikon titik tiga (more) di pojok kanan status viewer atau di daftar tab status.\n• Pengunduh Update Langsung di Aplikasi (In-App Downloader): Download pembaruan versi baru langsung di dalam RenChat dengan indikator persentase (progress bar) dan ukuran MB real-time tanpa perlu membuka Chrome.\n• Pemasangan Tanpa Menumpuk File: APK diunduh ke cache sistem dan langsung memicu penginstal bawaan Android (FileProvider) untuk menimpa versi lama secara aman tanpa menghilangkan chat.",
+  "version": "1.3.4",
+  "version_code": 17,
+  "title": "RenChat v1.3.4 - Perbaikan Tampilan Status & Kompresi Unggah Media",
+  "release_notes": "• Perbaikan Tampilan Status Foto: Gambar status yang beresolusi tinggi kini tampil jernih seketika dan tidak lagi blank/hitam saat durasi status berputar.\n• Kompresi Otomatis Status Media: Pengunggahan foto status kini dioptimasi secara otomatis sehingga tidak lagi mengalami kegagalan server sibuk akibat ukuran dokumen berlebih.\n• Optimasi Lampiran Chat & Profil: Penskalaan otomatis foto saat pengiriman chat dan penggantian avatar profil agar proses pengiriman selalu cepat dan lancar.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
