@@ -75,6 +75,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     _isVideo = widget.isVideo;
     _activeCallId = widget.existingCallId;
     _isSpeaker = widget.isVideo;
+    _isVideoOff = false;
     _liveAudioRecorder = AudioRecorder();
     _pulseController = AnimationController(
       vsync: this,
@@ -83,6 +84,12 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     _pulseAnimation = Tween<double>(begin: 0.95, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    // Jika masuk dari incoming call yang sudah dijawab (existingCallId)
+    if (widget.existingCallId != null) {
+      _isConnected = true;
+      _startTimer();
+    }
 
     _initLiveMicAudio();
     _startCallingSound();
@@ -165,18 +172,21 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       if (call.isVideo != _isVideo) {
         setState(() {
           _isVideo = call.isVideo;
-          if (_isVideo) _isSpeaker = true;
+          if (_isVideo) {
+            _isSpeaker = true;
+            _isVideoOff = false;
+          }
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              _isVideo ? 'Beralih ke Panggilan Video' : 'Beralih ke Panggilan Suara',
+              _isVideo ? 'Beralih ke Panggilan Video (Kamera Aktif)' : 'Beralih ke Panggilan Suara',
             ),
           ),
         );
       }
 
-      if (call.status == 'connected' && !_isConnected) {
+      if ((call.status == 'connected' || call.status == 'in_call') && !_isConnected) {
         _stopCallingSound();
         HapticFeedback.mediumImpact();
         setState(() {
@@ -570,14 +580,18 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
           child: Stack(
             children: [
               Container(
-                color: const Color(0xFF2A3942),
+                color: const Color(0xFF1B2830),
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.person, color: Colors.white70, size: 44),
-                      if (_currentMicLevel > 0.05) ...[
-                        const SizedBox(height: 6),
+                      UserAvatar(
+                        name: 'Anda',
+                        photoUrl: context.read<AuthService>().appUser?.photoURL,
+                        radius: 28,
+                      ),
+                      const SizedBox(height: 6),
+                      if (_currentMicLevel > 0.05)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
@@ -592,8 +606,16 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                               Text('Live Mic', style: TextStyle(color: WhatsAppTheme.primaryTeal, fontSize: 8.5, fontWeight: FontWeight.bold)),
                             ],
                           ),
+                        )
+                      else
+                        const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.videocam_rounded, color: WhatsAppTheme.primaryTeal, size: 12),
+                            SizedBox(width: 3),
+                            Text('Kamera Aktif', style: TextStyle(color: Colors.white70, fontSize: 8.5, fontWeight: FontWeight.bold)),
+                          ],
                         ),
-                      ],
                     ],
                   ),
                 ),

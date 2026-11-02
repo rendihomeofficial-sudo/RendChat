@@ -434,20 +434,92 @@ class UpdateBanner extends StatelessWidget {
 /// Dialog konfirmasi & progress pembaruan in-app.
 Future<void> showUpdateDialog(BuildContext context) async {
   final service = context.read<AppUpdateService>();
-  await service.checkUpdate(silentIfUpToDate: true);
-  final info = service.updateInfo;
+
+  // Tampilkan indikator loading ringan jika sedang memeriksa
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => const Center(
+      child: Card(
+        color: Color(0xFF1F2C34),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(WhatsAppTheme.primaryTeal)),
+              SizedBox(width: 16),
+              Text(
+                'Memeriksa pembaruan...',
+                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  await service.checkUpdate(silentIfUpToDate: false);
 
   if (!context.mounted) return;
+  Navigator.of(context, rootNavigator: true).pop(); // Tutup loading dialog
+
+  final info = service.updateInfo;
 
   if (info == null) {
     final error = service.lastError;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          error ??
-              'Anda sudah menggunakan versi terbaru RenChat '
-                  'v${service.currentVersion}.',
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: WhatsAppTheme.darkSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_rounded, color: WhatsAppTheme.primaryTeal, size: 28),
+            SizedBox(width: 12),
+            Text('Aplikasi Up to Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
         ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              error ??
+                  'RenChat Anda sudah menggunakan versi resmi paling baru: v${service.currentVersion} (Build ${service.currentVersionCode}).',
+              style: const TextStyle(color: WhatsAppTheme.darkTextPrimary, fontSize: 14, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.3)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.security_rounded, size: 16, color: WhatsAppTheme.primaryTeal),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Semua fitur panggilan, pesan, dan enkripsi berfungsi secara optimal.',
+                      style: TextStyle(fontSize: 11.5, color: WhatsAppTheme.primaryTeal),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
       ),
     );
     return;

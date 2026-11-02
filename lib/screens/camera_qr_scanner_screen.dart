@@ -69,25 +69,36 @@ class _CameraQrScannerScreenState extends State<CameraQrScannerScreen>
     );
   }
 
-  Future<void> _pickQrFromGallery() async {
+  Future<void> _captureWithCamera() async {
     HapticFeedback.lightImpact();
-    final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 90,
-    );
-    if (picked == null) return;
-
-    // Ekstrak nama atau deteksi file gambar QR
-    setState(() => _isProcessing = true);
-    await Future.delayed(const Duration(milliseconds: 700));
-
-    // Periksa apakah nama file mengandung ID atau prompt input manual
-    if (mounted) {
-      setState(() => _isProcessing = false);
-      _showQuickManualDialog(
-        initialText: '',
-        infoMessage: 'Foto berhasil dimuat dari galeri. Masukkan atau konfirmasi ID Pengguna jika belum terdeteksi otomatis.',
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.rear,
+        imageQuality: 92,
       );
+      if (picked == null) return;
+
+      setState(() => _isProcessing = true);
+      await Future.delayed(const Duration(milliseconds: 600));
+
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _showQuickManualDialog(
+          initialText: '',
+          infoMessage: 'Kamera berhasil memotret barcode/QR. Masukkan atau konfirmasi ID Pengguna untuk terhubung:',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        showPremiumNotificationToast(
+          context,
+          title: 'Izin Kamera',
+          message: 'Gagal membuka kamera perangkat: $e',
+          icon: Icons.camera_alt_outlined,
+          accentColor: const Color(0xFFEF4444),
+        );
+      }
     }
   }
 
@@ -164,6 +175,38 @@ class _CameraQrScannerScreenState extends State<CameraQrScannerScreen>
     } finally {
       if (mounted) {
         setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  Future<void> _pickQrFromGallery() async {
+    HapticFeedback.lightImpact();
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 90,
+      );
+      if (picked == null) return;
+
+      setState(() => _isProcessing = true);
+      await Future.delayed(const Duration(milliseconds: 600));
+
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _showQuickManualDialog(
+          initialText: '',
+          infoMessage: 'Foto barcode berhasil dipilih dari galeri. Masukkan atau konfirmasi ID Pengguna untuk terhubung:',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        showPremiumNotificationToast(
+          context,
+          title: 'Galeri',
+          message: 'Gagal memuat gambar: $e',
+          icon: Icons.photo_library_outlined,
+          accentColor: const Color(0xFFEF4444),
+        );
       }
     }
   }
@@ -395,13 +438,18 @@ class _CameraQrScannerScreenState extends State<CameraQrScannerScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _bottomActionButton(
+                      icon: Icons.camera_alt_rounded,
+                      label: 'Buka Kamera',
+                      onTap: _captureWithCamera,
+                    ),
+                    _bottomActionButton(
                       icon: Icons.photo_library_rounded,
-                      label: 'Pilih dari Galeri',
+                      label: 'Galeri',
                       onTap: _pickQrFromGallery,
                     ),
                     _bottomActionButton(
                       icon: Icons.keyboard_rounded,
-                      label: 'Input ID Teman',
+                      label: 'Input ID',
                       onTap: () => _showQuickManualDialog(),
                     ),
                   ],

@@ -1297,10 +1297,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               icon: const Icon(Icons.system_update_rounded, size: 16),
                               label: const Text('Periksa Update', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
                               onPressed: () {
-                                AppUpdateService.instance.checkUpdate(silentIfUpToDate: false);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Memeriksa pembaruan resmi RenChat...')),
-                                );
+                                showUpdateDialog(context);
                               },
                             ),
                           ],

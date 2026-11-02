@@ -55,17 +55,32 @@ class ChatService {
     return _usersRef.doc(uid).snapshots().map((snap) => snap.data());
   }
 
-  // Search users by name or email
+  // Search users by name, email, or UID
   Future<List<AppUser>> searchUsers(String query, String currentUserId) async {
-    final lower = query.toLowerCase().trim();
-    if (lower.isEmpty) return [];
+    final clean = query.trim();
+    if (clean.isEmpty) return [];
 
-    final snap = await _usersRef.limit(50).get();
+    // Jika pencarian adalah UID langsung
+    if (clean.length >= 8 && !clean.contains('@') && !clean.contains(' ')) {
+      try {
+        final directDoc = await _usersRef.doc(clean).get();
+        if (directDoc.exists && directDoc.data() != null) {
+          final found = directDoc.data()!;
+          if (found.uid != currentUserId) {
+            return [found];
+          }
+        }
+      } catch (_) {}
+    }
+
+    final lower = clean.toLowerCase();
+    final snap = await _usersRef.limit(100).get();
     return snap.docs
         .map((d) => d.data())
         .where((u) =>
             u.uid != currentUserId &&
-            (u.displayName.toLowerCase().contains(lower) ||
+            (u.uid.toLowerCase() == lower ||
+                u.displayName.toLowerCase().contains(lower) ||
                 u.email.toLowerCase().contains(lower)))
         .toList();
   }

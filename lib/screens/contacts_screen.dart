@@ -128,17 +128,16 @@ class _ContactsScreenState extends State<ContactsScreen> {
     final user = auth.appUser;
     if (user == null) return;
 
-    final inviteCode = 'RENCHAT:${user.uid}:${base64Encode(utf8.encode(user.displayName))}';
-
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: WhatsAppTheme.darkSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Row(
           children: [
             Icon(Icons.qr_code_2_rounded, color: WhatsAppTheme.primaryTeal),
             SizedBox(width: 8),
-            Text('Kode QR Saya'),
+            Text('Barcode Akun Saya', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           ],
         ),
         content: Column(
@@ -147,7 +146,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             UserAvatar(
               name: user.displayName,
               photoUrl: user.photoURL,
-              radius: 32,
+              radius: 34,
             ),
             const SizedBox(height: 10),
             Text(
@@ -155,7 +154,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
             ),
             const Text(
-              'Pindai atau bagikan kode ID ini untuk mengobrol instan',
+              'Pindai barcode ini atau salin ID Pengguna di bawah untuk mengobrol instan.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary),
             ),
@@ -166,6 +165,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
+                ],
               ),
               child: CustomPaint(
                 size: const Size(180, 180),
@@ -176,24 +178,28 @@ class _ContactsScreenState extends State<ContactsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF121B22),
+                color: const Color(0xFF101B20),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
+                  const Icon(Icons.badge_rounded, color: WhatsAppTheme.primaryTeal, size: 18),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'ID: ${user.uid.substring(0, user.uid.length.clamp(0, 18))}...',
-                      style: const TextStyle(fontSize: 12, color: WhatsAppTheme.primaryTeal),
+                      'ID: ${user.uid}',
+                      style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.copy_rounded, size: 18, color: WhatsAppTheme.primaryTeal),
-                    tooltip: 'Salin Kode Undangan',
+                    tooltip: 'Salin ID Pengguna',
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(text: inviteCode));
+                      Clipboard.setData(ClipboardData(text: user.uid));
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Kode undangan RenChat disalin!')),
+                        const SnackBar(content: Text('ID Akun RenChat disalin ke papan klip!')),
                       );
                     },
                   ),
@@ -203,7 +209,19 @@ class _ContactsScreenState extends State<ContactsScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup', style: TextStyle(color: WhatsAppTheme.darkTextSecondary))),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+            icon: const Icon(Icons.copy_rounded, size: 16),
+            label: const Text('Salin ID'),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: user.uid));
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('ID Akun RenChat disalin ke papan klip!')),
+              );
+            },
+          ),
         ],
       ),
     );
