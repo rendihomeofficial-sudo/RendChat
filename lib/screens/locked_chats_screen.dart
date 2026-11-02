@@ -108,6 +108,11 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                     final title = chat.getDisplayTitle(currentUserId);
                     final avatar = chat.getDisplayAvatar(currentUserId);
 
+                    final clearedTime = chat.getClearedAt(currentUserId);
+                    final isClearedForMe = clearedTime != null &&
+                        chat.lastMessageAt != null &&
+                        !chat.lastMessageAt!.isAfter(clearedTime);
+
                     return ListTile(
                       leading: UserAvatar(
                         name: title,
@@ -126,10 +131,17 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                         ],
                       ),
                       subtitle: Text(
-                        chat.lastMessage ?? 'No messages',
+                        isClearedForMe
+                            ? 'Obrolan telah dibersihkan'
+                            : (chat.lastMessage ?? 'No messages'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: WhatsAppTheme.darkTextSecondary),
+                        style: TextStyle(
+                          fontStyle: isClearedForMe ? FontStyle.italic : FontStyle.normal,
+                          color: isClearedForMe
+                              ? WhatsAppTheme.darkTextSecondary.withValues(alpha: 0.6)
+                              : WhatsAppTheme.darkTextSecondary,
+                        ),
                       ),
                       trailing: IconButton(
                         icon: const Icon(Icons.lock_open_rounded, color: WhatsAppTheme.primaryTeal),

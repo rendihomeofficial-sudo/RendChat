@@ -566,6 +566,56 @@ class ChatService {
     }
   }
 
+  // WhatsApp Mute Notifications: durasi dalam jam (8 jam, 1 minggu, selalu / 100 tahun)
+  Future<void> muteChat({
+    required String chatId,
+    required String userId,
+    required Duration duration,
+  }) async {
+    final docRef = _chatsRef.doc(chatId);
+    final snap = await docRef.get();
+    if (!snap.exists) return;
+
+    final chat = snap.data()!;
+    final mutedMap = Map<String, DateTime>.from(chat.mutedUntil);
+    mutedMap[userId] = DateTime.now().add(duration);
+
+    await docRef.update({
+      'mutedUntil': mutedMap.map((k, v) => MapEntry(k, Timestamp.fromDate(v))),
+    });
+  }
+
+  // WhatsApp Unmute Notifications
+  Future<void> unmuteChat({
+    required String chatId,
+    required String userId,
+  }) async {
+    final docRef = _chatsRef.doc(chatId);
+    final snap = await docRef.get();
+    if (!snap.exists) return;
+
+    final chat = snap.data()!;
+    final mutedMap = Map<String, DateTime>.from(chat.mutedUntil);
+    mutedMap.remove(userId);
+
+    await docRef.update({
+      'mutedUntil': mutedMap.map((k, v) => MapEntry(k, Timestamp.fromDate(v))),
+    });
+  }
+
+  // WhatsApp Disappearing Messages: set durasi (detik, null / 0 untuk nonaktif)
+  Future<void> setDisappearingMessages({
+    required String chatId,
+    int? durationInSeconds,
+  }) async {
+    final docRef = _chatsRef.doc(chatId);
+    await docRef.update({
+      'disappearingDuration': (durationInSeconds != null && durationInSeconds > 0)
+          ? durationInSeconds
+          : FieldValue.delete(),
+    });
+  }
+
   // RenChat Contact Block & Unblock System
   Future<bool> toggleBlockUser({required String currentUserId, required String targetUserId}) async {
     final docRef = _usersRef.doc(currentUserId);

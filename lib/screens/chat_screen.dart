@@ -757,6 +757,237 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
+  void _showMuteChatDialog(BuildContext context, ChatService chatService, String currentUid) {
+    final isCurrentlyMuted = widget.chat.isMutedFor(currentUid);
+    if (isCurrentlyMuted) {
+      showDialog(
+        context: context,
+        builder: (dCtx) => AlertDialog(
+          backgroundColor: WhatsAppTheme.darkSurface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Bunyikan Notifikasi?'),
+          content: const Text(
+            'Notifikasi untuk obrolan ini saat ini dibisukan. Apakah Anda ingin mengaktifkan kembali bunyinya?',
+            style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx),
+              child: const Text('Batal', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+              onPressed: () async {
+                Navigator.pop(dCtx);
+                await chatService.unmuteChat(chatId: widget.chat.id, userId: currentUid);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Notifikasi obrolan diaktifkan kembali')),
+                  );
+                }
+              },
+              child: const Text('Bunyikan'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    int selectedDurationHours = 8;
+    showDialog(
+      context: context,
+      builder: (dCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: WhatsAppTheme.darkSurface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Bisukan Notifikasi'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Peserta lain tidak akan tahu bahwa Anda telah membisukan obrolan ini.',
+                style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13.5),
+              ),
+              const SizedBox(height: 12),
+              RadioListTile<int>(
+                title: const Text('8 Jam'),
+                value: 8,
+                groupValue: selectedDurationHours,
+                activeColor: WhatsAppTheme.primaryTeal,
+                contentPadding: EdgeInsets.zero,
+                onChanged: (val) => setDialogState(() => selectedDurationHours = val!),
+              ),
+              RadioListTile<int>(
+                title: const Text('1 Minggu'),
+                value: 168,
+                groupValue: selectedDurationHours,
+                activeColor: WhatsAppTheme.primaryTeal,
+                contentPadding: EdgeInsets.zero,
+                onChanged: (val) => setDialogState(() => selectedDurationHours = val!),
+              ),
+              RadioListTile<int>(
+                title: const Text('Selalu'),
+                value: 876000, // 100 tahun
+                groupValue: selectedDurationHours,
+                activeColor: WhatsAppTheme.primaryTeal,
+                contentPadding: EdgeInsets.zero,
+                onChanged: (val) => setDialogState(() => selectedDurationHours = val!),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx),
+              child: const Text('Batal', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+              onPressed: () async {
+                Navigator.pop(dCtx);
+                await chatService.muteChat(
+                  chatId: widget.chat.id,
+                  userId: currentUid,
+                  duration: Duration(hours: selectedDurationHours),
+                );
+                if (mounted) {
+                  final label = selectedDurationHours == 8
+                      ? '8 jam'
+                      : (selectedDurationHours == 168 ? '1 minggu' : 'selalu');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Notifikasi dibisukan untuk $label')),
+                  );
+                }
+              },
+              child: const Text('Oke'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDisappearingMessagesPicker(BuildContext context, ChatService chatService) {
+    int currentDuration = widget.chat.disappearingDuration ?? 0;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: WhatsAppTheme.darkSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (bCtx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Pesan Sementara',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(bCtx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Untuk privasi dan penyimpanan yang lebih terjaga, pesan baru akan terhapus otomatis setelah durasi yang dipilih.',
+                  style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                RadioListTile<int>(
+                  title: const Text('24 Jam'),
+                  value: 86400,
+                  groupValue: currentDuration,
+                  activeColor: WhatsAppTheme.primaryTeal,
+                  onChanged: (val) async {
+                    setSheetState(() => currentDuration = val!);
+                    Navigator.pop(bCtx);
+                    await chatService.setDisappearingMessages(
+                      chatId: widget.chat.id,
+                      durationInSeconds: 86400,
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Pesan sementara disetel ke 24 jam')),
+                      );
+                    }
+                  },
+                ),
+                RadioListTile<int>(
+                  title: const Text('7 Hari'),
+                  value: 604800,
+                  groupValue: currentDuration,
+                  activeColor: WhatsAppTheme.primaryTeal,
+                  onChanged: (val) async {
+                    setSheetState(() => currentDuration = val!);
+                    Navigator.pop(bCtx);
+                    await chatService.setDisappearingMessages(
+                      chatId: widget.chat.id,
+                      durationInSeconds: 604800,
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Pesan sementara disetel ke 7 hari')),
+                      );
+                    }
+                  },
+                ),
+                RadioListTile<int>(
+                  title: const Text('90 Hari'),
+                  value: 7776000,
+                  groupValue: currentDuration,
+                  activeColor: WhatsAppTheme.primaryTeal,
+                  onChanged: (val) async {
+                    setSheetState(() => currentDuration = val!);
+                    Navigator.pop(bCtx);
+                    await chatService.setDisappearingMessages(
+                      chatId: widget.chat.id,
+                      durationInSeconds: 7776000,
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Pesan sementara disetel ke 90 hari')),
+                      );
+                    }
+                  },
+                ),
+                RadioListTile<int>(
+                  title: const Text('Mati (Nonaktif)'),
+                  value: 0,
+                  groupValue: currentDuration,
+                  activeColor: WhatsAppTheme.primaryTeal,
+                  onChanged: (val) async {
+                    setSheetState(() => currentDuration = 0);
+                    Navigator.pop(bCtx);
+                    await chatService.setDisappearingMessages(
+                      chatId: widget.chat.id,
+                      durationInSeconds: 0,
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Pesan sementara dinonaktifkan')),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _handleMenuAction(BuildContext context, String action, String title, String? otherUid, [bool isBlocked = false]) {
     final auth = context.read<AuthService>();
     final chatService = context.read<ChatService>();
@@ -788,22 +1019,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         setState(() => _isSearching = true);
         break;
       case 'mute':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Notifications muted for 8 hours')),
-        );
+        _showMuteChatDialog(context, chatService, currentUid);
         break;
       case 'disappearing':
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: WhatsAppTheme.darkSurface,
-            title: const Text('Disappearing messages'),
-            content: const Text('For more privacy and storage, new messages will disappear from this chat for everyone after the selected duration.\n\n• 24 hours\n• 7 days\n• 90 days\n• Off (Current)'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK', style: TextStyle(color: WhatsAppTheme.primaryTeal))),
-            ],
-          ),
-        );
+        _showDisappearingMessagesPicker(context, chatService);
         break;
       case 'wallpaper':
         _showChatWallpaperPicker(context);

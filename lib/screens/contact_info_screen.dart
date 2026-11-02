@@ -28,11 +28,15 @@ class ContactInfoScreen extends StatefulWidget {
 
 class _ContactInfoScreenState extends State<ContactInfoScreen> {
   late bool _isLocked;
+  late bool _isMuted;
+  late int? _disappearingDuration;
 
   @override
   void initState() {
     super.initState();
     _isLocked = widget.chat.isLockedBy(widget.currentUserId);
+    _isMuted = widget.chat.isMutedFor(widget.currentUserId);
+    _disappearingDuration = widget.chat.disappearingDuration;
   }
 
   @override
@@ -159,13 +163,84 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                       leading: const Icon(Icons.notifications_outlined, color: WhatsAppTheme.darkTextSecondary),
                       title: const Text('Mute notifications'),
                       trailing: Switch(
-                        value: false,
+                        value: _isMuted,
                         activeThumbColor: WhatsAppTheme.primaryTeal,
                         activeTrackColor: WhatsAppTheme.primaryTeal.withValues(alpha: 0.5),
-                        onChanged: (val) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(val ? 'Notifications muted' : 'Notifications unmuted')),
-                          );
+                        onChanged: (val) async {
+                          if (val) {
+                            int selectedHours = 8;
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (dCtx) => StatefulBuilder(
+                                builder: (ctx, setDialogState) => AlertDialog(
+                                  backgroundColor: WhatsAppTheme.darkSurface,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                  title: const Text('Mute Notifications'),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      RadioListTile<int>(
+                                        title: const Text('8 Hours'),
+                                        value: 8,
+                                        groupValue: selectedHours,
+                                        activeColor: WhatsAppTheme.primaryTeal,
+                                        onChanged: (v) => setDialogState(() => selectedHours = v!),
+                                      ),
+                                      RadioListTile<int>(
+                                        title: const Text('1 Week'),
+                                        value: 168,
+                                        groupValue: selectedHours,
+                                        activeColor: WhatsAppTheme.primaryTeal,
+                                        onChanged: (v) => setDialogState(() => selectedHours = v!),
+                                      ),
+                                      RadioListTile<int>(
+                                        title: const Text('Always'),
+                                        value: 876000,
+                                        groupValue: selectedHours,
+                                        activeColor: WhatsAppTheme.primaryTeal,
+                                        onChanged: (v) => setDialogState(() => selectedHours = v!),
+                                      ),
+                                    ],
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(dCtx, false),
+                                      child: const Text('Cancel', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+                                    ),
+                                    FilledButton(
+                                      style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+                                      onPressed: () => Navigator.pop(dCtx, true),
+                                      child: const Text('OK'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                            if (confirmed == true && mounted) {
+                              setState(() => _isMuted = true);
+                              await chatService.muteChat(
+                                chatId: chat.id,
+                                userId: currentUserId,
+                                duration: Duration(hours: selectedHours),
+                              );
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Notifications muted')),
+                                );
+                              }
+                            }
+                          } else {
+                            setState(() => _isMuted = false);
+                            await chatService.unmuteChat(
+                              chatId: chat.id,
+                              userId: currentUserId,
+                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Notifications unmuted')),
+                              );
+                            }
+                          }
                         },
                       ),
                     ),
@@ -173,9 +248,108 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                     ListTile(
                       leading: const Icon(Icons.timer_outlined, color: WhatsAppTheme.darkTextSecondary),
                       title: const Text('Disappearing messages'),
-                      subtitle: const Text('Off', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+                      subtitle: Text(
+                        _disappearingDuration == 86400
+                            ? '24 hours'
+                            : (_disappearingDuration == 604800
+                                ? '7 days'
+                                : (_disappearingDuration == 7776000 ? '90 days' : 'Off')),
+                        style: const TextStyle(color: WhatsAppTheme.darkTextSecondary),
+                      ),
                       trailing: const Icon(Icons.chevron_right_rounded, color: WhatsAppTheme.darkTextSecondary),
-                      onTap: () => Navigator.pop(context, 'disappearing'),
+                      onTap: () async {
+                        int currentSec = _disappearingDuration ?? 0;
+                        await showModalBottomSheet(
+                          context: context,
+                          backgroundColor: WhatsAppTheme.darkSurface,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (bCtx) => StatefulBuilder(
+                            builder: (ctx, setSheetState) => SafeArea(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Disappearing Messages',
+                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    const Text(
+                                      'For more privacy and storage, new messages will disappear from this chat for everyone after the selected duration.',
+                                      style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    RadioListTile<int>(
+                                      title: const Text('24 Hours'),
+                                      value: 86400,
+                                      groupValue: currentSec,
+                                      activeColor: WhatsAppTheme.primaryTeal,
+                                      onChanged: (val) async {
+                                        setSheetState(() => currentSec = val!);
+                                        Navigator.pop(bCtx);
+                                        setState(() => _disappearingDuration = 86400);
+                                        await chatService.setDisappearingMessages(
+                                          chatId: chat.id,
+                                          durationInSeconds: 86400,
+                                        );
+                                      },
+                                    ),
+                                    RadioListTile<int>(
+                                      title: const Text('7 Days'),
+                                      value: 604800,
+                                      groupValue: currentSec,
+                                      activeColor: WhatsAppTheme.primaryTeal,
+                                      onChanged: (val) async {
+                                        setSheetState(() => currentSec = val!);
+                                        Navigator.pop(bCtx);
+                                        setState(() => _disappearingDuration = 604800);
+                                        await chatService.setDisappearingMessages(
+                                          chatId: chat.id,
+                                          durationInSeconds: 604800,
+                                        );
+                                      },
+                                    ),
+                                    RadioListTile<int>(
+                                      title: const Text('90 Days'),
+                                      value: 7776000,
+                                      groupValue: currentSec,
+                                      activeColor: WhatsAppTheme.primaryTeal,
+                                      onChanged: (val) async {
+                                        setSheetState(() => currentSec = val!);
+                                        Navigator.pop(bCtx);
+                                        setState(() => _disappearingDuration = 7776000);
+                                        await chatService.setDisappearingMessages(
+                                          chatId: chat.id,
+                                          durationInSeconds: 7776000,
+                                        );
+                                      },
+                                    ),
+                                    RadioListTile<int>(
+                                      title: const Text('Off'),
+                                      value: 0,
+                                      groupValue: currentSec,
+                                      activeColor: WhatsAppTheme.primaryTeal,
+                                      onChanged: (val) async {
+                                        setSheetState(() => currentSec = 0);
+                                        Navigator.pop(bCtx);
+                                        setState(() => _disappearingDuration = null);
+                                        await chatService.setDisappearingMessages(
+                                          chatId: chat.id,
+                                          durationInSeconds: 0,
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     const Divider(height: 1, indent: 56),
                     ListTile(

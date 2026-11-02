@@ -24,6 +24,12 @@ class Chat {
   // WhatsApp Clear Chat: clearedAt timestamp per-user (userId -> DateTime)
   final Map<String, DateTime> clearedAt;
 
+  // WhatsApp Mute: mutedUntil timestamp per-user (userId -> DateTime expiry)
+  final Map<String, DateTime> mutedUntil;
+
+  // WhatsApp Disappearing Messages: duration in seconds (e.g. 86400 for 24h, null/0 for Off)
+  final int? disappearingDuration;
+
   const Chat({
     required this.id,
     required this.isGroup,
@@ -43,6 +49,8 @@ class Chat {
     this.archivedBy = const [],
     this.lockedBy = const [],
     this.clearedAt = const {},
+    this.mutedUntil = const {},
+    this.disappearingDuration,
   });
 
   factory Chat.fromFirestore(
@@ -60,6 +68,16 @@ class Chat {
         clearedAt[k] = _parseDateTime(v);
       }
     });
+
+    final mutedUntilRaw = data['mutedUntil'] as Map<String, dynamic>? ?? {};
+    final mutedUntil = <String, DateTime>{};
+    mutedUntilRaw.forEach((k, v) {
+      if (v != null) {
+        mutedUntil[k] = _parseDateTime(v);
+      }
+    });
+
+    final disappearingDuration = (data['disappearingDuration'] as num?)?.toInt();
 
     return Chat(
       id: snapshot.id,
@@ -80,6 +98,8 @@ class Chat {
       archivedBy: (data['archivedBy'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
       lockedBy: (data['lockedBy'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
       clearedAt: clearedAt,
+      mutedUntil: mutedUntil,
+      disappearingDuration: disappearingDuration,
     );
   }
 
@@ -102,6 +122,8 @@ class Chat {
       'archivedBy': archivedBy,
       'lockedBy': lockedBy,
       'clearedAt': clearedAt.map((k, v) => MapEntry(k, Timestamp.fromDate(v))),
+      'mutedUntil': mutedUntil.map((k, v) => MapEntry(k, Timestamp.fromDate(v))),
+      if (disappearingDuration != null) 'disappearingDuration': disappearingDuration,
     };
   }
 
@@ -115,6 +137,17 @@ class Chat {
     if (clearedTime == null) return true;
     return messageCreatedAt.isAfter(clearedTime);
   }
+
+  DateTime? getMutedUntil(String userId) => mutedUntil[userId];
+
+  bool isMutedFor(String userId) {
+    final expiry = mutedUntil[userId];
+    if (expiry == null) return false;
+    return expiry.isAfter(DateTime.now());
+  }
+
+  bool get hasDisappearingMessages =>
+      disappearingDuration != null && disappearingDuration! > 0;
 
   String getDisplayTitle(String currentUserId) {
     if (isGroup) {

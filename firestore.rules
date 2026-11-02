@@ -51,7 +51,9 @@ service cloud.firestore {
                            'pinnedBy',
                            'archivedBy',
                            'lockedBy',
-                           'clearedAt'
+                           'clearedAt',
+                           'mutedUntil',
+                           'disappearingDuration'
                          ]);
       allow delete: if isSignedIn() && (resource.data.createdBy == request.auth.uid || isChatParticipant(chatId));
 
