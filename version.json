@@ -1,8 +1,8 @@
 {
-  "version": "1.3.10",
-  "version_code": 23,
-  "title": "RenChat v1.3.10 - Live VC Camera Instan, Swap Video Call, Timer Durasi Panggilan, & Barcode QR Modern",
-  "release_notes": "• Live Video Camera Instan: Kamera dan avatar langsung aktif seketika saat menekan VC atau swap dari panggilan suara ke video call.\n• Floating Self-View PIP Interaktif: Jendela kamera diri sendiri dapat digeser (draggable) ke sudut mana saja dengan indikator live camera & live mic.\n• Realtime Call Duration Timer: Timer durasi panggilan berjalan detik demi detik secara nyata menggantikan status memanggil saat tersambung.\n• Barcode QR Akun Modern & Profesional: Berbagi kontak kini menggunakan Barcode QR elegan dan Salin ID instan, tanpa tautan teks panjang.\n• Scanner Barcode Kamera Nyata: Fitur pemindai dilengkapi tombol Buka Kamera perangkat langsung, Galeri foto, dan pencarian cepat berbasis ID akun.\n• Dialog Pembaruan Aplikasi Akurat: Tombol Periksa Update memberikan dialog status jelas jika aplikasi sudah up-to-date atau siap pasang.",
+  "version": "1.3.11",
+  "version_code": 24,
+  "title": "RenChat v1.3.11 - Live Hardware CameraPreview PIP, Sensor Kamera Depan/Belakang, & Izin Lengkap GPS/Audio",
+  "release_notes": "• Integrasi Sensor Kamera Fisik Nyata: Menggunakan CameraController & CameraPreview langsung dari package camera Flutter pada jendela PIP self-view.\n• Swap Kamera Depan/Belakang: Tombol flip kamera memutar lensa seketika dengan preview hardware langsung.\n• Izin Lengkap AndroidManifest: Menambahkan GPS (ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION), hardware audio (MODIFY_AUDIO_SETTINGS), getar (VIBRATE), wake lock panggilan, dan media storage Android 13+.\n• minSdk disesuaikan ke 21 untuk kompatibilitas penuh native camera Flutter di seluruh perangkat Android.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -54,6 +55,12 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   StreamSubscription<Amplitude>? _amplitudeSub;
   double _currentMicLevel = 0.0;
 
+  // Real Camera Hardware Controller
+  CameraController? _cameraController;
+  List<CameraDescription> _availableCameras = [];
+  bool _isCameraInitializing = false;
+  bool _hasCameraError = false;
+
   // Draggable PIP Self-View Position
   Offset _pipPosition = const Offset(20, 100);
   bool _isPipInitialized = false;
@@ -91,9 +98,81 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       _startTimer();
     }
 
+    if (_isVideo) {
+      _initRealCamera();
+    }
+
     _initLiveMicAudio();
     _startCallingSound();
     _initiateFirestoreCall();
+  }
+
+  // Inisialisasi sensor kamera fisik nyata perangkat (kamera depan / belakang)
+  Future<void> _initRealCamera() async {
+    if (_isCameraInitializing || !mounted) return;
+    _isCameraInitializing = true;
+
+    try {
+      if (_availableCameras.isEmpty) {
+        _availableCameras = await availableCameras();
+      }
+
+      if (_availableCameras.isEmpty) {
+        debugPrint('Tidak ada sensor kamera yang terdeteksi di perangkat.');
+        setState(() {
+          _hasCameraError = true;
+          _isCameraInitializing = false;
+        });
+        return;
+      }
+
+      final desiredDirection =
+          _isFrontCamera ? CameraLensDirection.front : CameraLensDirection.back;
+      CameraDescription selected = _availableCameras.firstWhere(
+        (cam) => cam.lensDirection == desiredDirection,
+        orElse: () => _availableCameras.first,
+      );
+
+      await _cameraController?.dispose();
+      _cameraController = CameraController(
+        selected,
+        ResolutionPreset.medium,
+        enableAudio: false, // Audio ditangani langsung oleh _liveAudioRecorder
+      );
+
+      await _cameraController!.initialize();
+
+      if (mounted) {
+        setState(() {
+          _hasCameraError = false;
+          _isCameraInitializing = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error menginisialisasi kamera fisik: $e');
+      if (mounted) {
+        setState(() {
+          _hasCameraError = true;
+          _isCameraInitializing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _switchCamera() async {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _isFrontCamera = !_isFrontCamera;
+    });
+    await _initRealCamera();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(milliseconds: 900),
+          content: Text(_isFrontCamera ? 'Kamera depan aktif' : 'Kamera belakang aktif'),
+        ),
+      );
+    }
   }
 
   // Inisialisasi input audio mikrofon live berkecepatan tinggi tanpa lag
@@ -175,6 +254,10 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
           if (_isVideo) {
             _isSpeaker = true;
             _isVideoOff = false;
+            _initRealCamera();
+          } else {
+            _cameraController?.dispose();
+            _cameraController = null;
           }
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -312,6 +395,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     _recordSub?.cancel();
     _amplitudeSub?.cancel();
     _liveAudioRecorder.dispose();
+    _cameraController?.dispose();
     _receiverPresenceSub?.cancel();
     _stopCallingSound();
     _pulseController.dispose();
@@ -578,55 +662,82 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
           ),
           clipBehavior: Clip.antiAlias,
           child: Stack(
+            fit: StackFit.expand,
             children: [
-              Container(
-                color: const Color(0xFF1B2830),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      UserAvatar(
-                        name: 'Anda',
-                        photoUrl: context.read<AuthService>().appUser?.photoURL,
-                        radius: 28,
-                      ),
-                      const SizedBox(height: 6),
-                      if (_currentMicLevel > 0.05)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.25),
-                            borderRadius: BorderRadius.circular(8),
+              // 1. TAMPILAN KAMERA NYATA (Jika controller siap)
+              if (_cameraController != null &&
+                  _cameraController!.value.isInitialized &&
+                  !_hasCameraError)
+                FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: _cameraController!.value.previewSize?.height ?? pipWidth,
+                    height: _cameraController!.value.previewSize?.width ?? pipHeight,
+                    child: CameraPreview(_cameraController!),
+                  ),
+                )
+              else
+                // 2. FALLBACK PROFILE AVATAR & LOADING INDICATOR
+                Container(
+                  color: const Color(0xFF1B2830),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_isCameraInitializing)
+                          const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(WhatsAppTheme.primaryTeal),
+                            ),
+                          )
+                        else
+                          UserAvatar(
+                            name: 'Anda',
+                            photoUrl: context.read<AuthService>().appUser?.photoURL,
+                            radius: 28,
                           ),
-                          child: const Row(
+                        const SizedBox(height: 6),
+                        if (_currentMicLevel > 0.05)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.mic_rounded, color: WhatsAppTheme.primaryTeal, size: 10),
+                                SizedBox(width: 2),
+                                Text('Live Mic', style: TextStyle(color: WhatsAppTheme.primaryTeal, fontSize: 8.5, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          )
+                        else
+                          Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.mic_rounded, color: WhatsAppTheme.primaryTeal, size: 10),
-                              SizedBox(width: 2),
-                              Text('Live Mic', style: TextStyle(color: WhatsAppTheme.primaryTeal, fontSize: 8.5, fontWeight: FontWeight.bold)),
+                              Icon(_isCameraInitializing ? Icons.hourglass_top_rounded : Icons.videocam_rounded, color: WhatsAppTheme.primaryTeal, size: 12),
+                              const SizedBox(width: 3),
+                              Text(_isCameraInitializing ? 'Membuka Kamera...' : 'Kamera Aktif', style: const TextStyle(color: Colors.white70, fontSize: 8.5, fontWeight: FontWeight.bold)),
                             ],
                           ),
-                        )
-                      else
-                        const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.videocam_rounded, color: WhatsAppTheme.primaryTeal, size: 12),
-                            SizedBox(width: 3),
-                            Text('Kamera Aktif', style: TextStyle(color: Colors.white70, fontSize: 8.5, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
+
+              // Overlay badge "Anda"
               Positioned(
                 top: 6,
                 left: 8,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.black45,
+                    color: Colors.black54,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
@@ -635,19 +746,13 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                   ),
                 ),
               ),
+
+              // Tombol ganti kamera depan <-> belakang
               Positioned(
                 bottom: 6,
                 right: 6,
                 child: GestureDetector(
-                  onTap: () {
-                    setState(() => _isFrontCamera = !_isFrontCamera);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        duration: const Duration(milliseconds: 900),
-                        content: Text(_isFrontCamera ? 'Kamera depan aktif' : 'Kamera belakang aktif'),
-                      ),
-                    );
-                  },
+                  onTap: _switchCamera,
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: const BoxDecoration(
@@ -840,6 +945,10 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                     if (newVideoState) {
                       _isSpeaker = true;
                       _isVideoOff = false;
+                      _initRealCamera();
+                    } else {
+                      _cameraController?.dispose();
+                      _cameraController = null;
                     }
                   });
                   if (_activeCallId != null) {

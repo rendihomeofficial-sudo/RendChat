@@ -7,10 +7,28 @@
 
     <!-- Notifikasi push (Android 13+ memerlukan izin runtime) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
 
-    <!-- Izin Kamera dan Audio untuk pengambilan foto & panggilan suara/video -->
+    <!-- Izin Kamera dan Audio untuk panggilan video nyata & panggilan suara -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+
+    <!-- Hardware Camera Features (Tidak wajib harus ada flash/autofocus agar kompatibel di semua tipe HP) -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.front" android:required="false"/>
+
+    <!-- Lokasi / GPS untuk fitur Berbagi Lokasi Langsung (Live Location) di Chat -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
+    <!-- Akses Galeri & Media Gambar/Video/Audio (Android 13+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
 
     <!-- Izin instalar APK pembaruan langsung dari aplikasi -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>

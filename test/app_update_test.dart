@@ -3,33 +3,33 @@ import 'package:messenger_app/services/app_update_service.dart';
 
 void main() {
   group('AppUpdateService Unit & Parsing Tests', () {
-    test('AppUpdateInfo.fromJson parses v1.3.10 manifest payload correctly', () {
+    test('AppUpdateInfo.fromJson parses v1.3.11 manifest payload correctly', () {
       final jsonPayload = {
-        'version': '1.3.10',
-        'version_code': 23,
-        'title': 'RenChat v1.3.10 - Live VC Camera Instan, Swap Video Call, Timer Durasi Panggilan, & Barcode QR Modern',
-        'release_notes': '• Live Video Camera Instan\n• Floating Self-View PIP Interaktif\n• Realtime Call Duration Timer',
+        'version': '1.3.11',
+        'version_code': 24,
+        'title': 'RenChat v1.3.11 - Live Hardware CameraPreview PIP',
+        'release_notes': '• Integrasi Sensor Kamera Fisik Nyata\n• Swap Kamera Depan/Belakang',
         'apk_url': 'https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk',
         'fallback_url': 'https://github.com/rendihomeofficial-sudo/RendChat',
       };
 
       final info = AppUpdateInfo.fromJson(jsonPayload);
 
-      expect(info.version, equals('1.3.10'));
-      expect(info.versionCode, equals(23));
-      expect(info.title, contains('RenChat v1.3.10'));
-      expect(info.releaseNotes, contains('Live Video Camera Instan'));
+      expect(info.version, equals('1.3.11'));
+      expect(info.versionCode, equals(24));
+      expect(info.title, contains('RenChat v1.3.11'));
+      expect(info.releaseNotes, contains('Sensor Kamera Fisik Nyata'));
       expect(info.apkUrl, endsWith('RenChat.apk'));
       expect(info.fallbackUrl, contains('RendChat'));
     });
 
     test('AppUpdateInfo recognizes update when remote versionCode is greater than local', () {
-      const currentLocalVersionCode = 22; // v1.3.9
+      const currentLocalVersionCode = 23; // v1.3.10
 
       final remoteInfo = AppUpdateInfo(
-        version: '1.3.10',
-        versionCode: 23,
-        title: 'RenChat v1.3.10',
+        version: '1.3.11',
+        versionCode: 24,
+        title: 'RenChat v1.3.11',
         releaseNotes: 'Fitur baru',
         apkUrl: 'https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk',
         fallbackUrl: 'https://github.com/rendihomeofficial-sudo/RendChat',
@@ -40,12 +40,12 @@ void main() {
     });
 
     test('AppUpdateInfo does not trigger update when already on latest version', () {
-      const currentLocalVersionCode = 23; // v1.3.10
+      const currentLocalVersionCode = 24; // v1.3.11
 
       final remoteInfo = AppUpdateInfo(
-        version: '1.3.10',
-        versionCode: 23,
-        title: 'RenChat v1.3.10',
+        version: '1.3.11',
+        versionCode: 24,
+        title: 'RenChat v1.3.11',
         releaseNotes: 'Fitur baru',
         apkUrl: 'https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk',
         fallbackUrl: 'https://github.com/rendihomeofficial-sudo/RendChat',
