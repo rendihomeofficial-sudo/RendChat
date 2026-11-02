@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import '../models/call_model.dart';
+import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/call_history_manager.dart';
 import '../services/chat_service.dart';
