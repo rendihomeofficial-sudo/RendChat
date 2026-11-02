@@ -784,34 +784,59 @@ class ChatService {
     });
   }
 
-  // Clear chat (hapus semua pesan riil di percakapan)
-  Future<void> clearChat(String chatId) async {
-    try {
-      final messagesSnap = await _messagesRef(chatId).get();
-      final batch = _firestore.batch();
-      for (final doc in messagesSnap.docs) {
-        batch.delete(doc.reference);
-      }
-      await batch.commit();
+  // Stream a single chat document in realtime
+  Stream<Chat?> streamChat(String chatId) {
+    return _chatsRef.doc(chatId).snapshots().map((snap) => snap.data());
+  }
 
-      // Reset info pesan terakhir di dokumen chat
-      await _chatsRef.doc(chatId).update({
-        'lastMessage': 'Obrolan telah dibersihkan',
-        'lastMessageAt': Timestamp.now(),
-        'unread': {},
-      });
+  // Clear chat model WhatsApp: mencatat timestamp pembersihan per pengguna (clearedAt[userId])
+  // Ini menyembunyikan riwayat obrolan di perangkat pengguna tanpa menghapus riwayat milik lawan bicara.
+  Future<void> clearChat(String chatId, {String? userId}) async {
+    try {
+      final docRef = _chatsRef.doc(chatId);
+      final snap = await docRef.get();
+      if (!snap.exists) return;
+
+      final now = DateTime.now();
+      if (userId != null && userId.isNotEmpty) {
+        final chat = snap.data()!;
+        final clearedMap = Map<String, DateTime>.from(chat.clearedAt);
+        clearedMap[userId] = now;
+
+        final newUnread = Map<String, int>.from(chat.unread);
+        newUnread[userId] = 0;
+
+        await docRef.update({
+          'clearedAt': clearedMap.map((k, v) => MapEntry(k, Timestamp.fromDate(v))),
+          'unread': newUnread,
+        });
+      } else {
+        // Fallback jika tanpa userId: bersihkan seluruh dokumen pesan untuk semua orang
+        final messagesSnap = await _messagesRef(chatId).get();
+        final batch = _firestore.batch();
+        for (final doc in messagesSnap.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+
+        await docRef.update({
+          'lastMessage': 'Obrolan telah dibersihkan',
+          'lastMessageAt': Timestamp.now(),
+          'unread': {},
+        });
+      }
     } catch (e) {
       debugPrint('Error clearing chat messages: $e');
       rethrow;
     }
   }
 
-  // Clear all chats for user (hapus seluruh pesan di semua chat pengguna)
+  // Clear all chats for user (mencatat clearedAt untuk semua obrolan yang diikuti user)
   Future<void> clearAllChatsForUser(String userId) async {
     try {
       final userChats = await _chatsRef.where('participants', arrayContains: userId).get();
       for (final chatDoc in userChats.docs) {
-        await clearChat(chatDoc.id);
+        await clearChat(chatDoc.id, userId: userId);
       }
     } catch (e) {
       debugPrint('Error clearing all user chats: $e');

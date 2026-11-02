@@ -73,6 +73,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   // Cached persistent streams to prevent stream re-creation & reload during typing
   Stream<List<Message>>? _messagesStream;
+  Stream<Chat?>? _chatStream;
   Stream<List<String>>? _typingStream;
   Stream<AppUser?>? _otherUserStream;
   Stream<bool>? _isBlockedStream;
@@ -88,6 +89,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (myUid != null) {
       chatService.markChatAsRead(widget.chat.id, myUid);
       _messagesStream = chatService.streamMessages(widget.chat.id);
+      _chatStream = chatService.streamChat(widget.chat.id);
       _typingStream = chatService.streamTypingUsers(widget.chat.id, myUid);
       final otherUid = widget.chat.getOtherUserId(myUid);
       if (otherUid != null) {
@@ -820,7 +822,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ],
             ),
             content: const Text(
-              'Seluruh riwayat pesan di percakapan ini akan dihapus secara permanen dari server dan perangkat Anda.',
+              'Seluruh riwayat pesan di obrolan ini akan dihapus dari perangkat Anda. Pesan pada lawan bicara Anda tidak akan terpengaruh.',
               style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13.5, height: 1.35),
             ),
             actions: [
@@ -836,12 +838,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 onPressed: () async {
                   Navigator.pop(ctx);
                   try {
-                    await context.read<ChatService>().clearChat(widget.chat.id);
+                    await context.read<ChatService>().clearChat(
+                          widget.chat.id,
+                          userId: currentUser.uid,
+                        );
                     if (mounted) {
                       showPremiumNotificationToast(
                         context,
                         title: 'Obrolan Dibersihkan',
-                        message: 'Semua pesan dalam percakapan ini telah dihapus.',
+                        message: 'Semua pesan dalam percakapan ini telah dibersihkan dari perangkat Anda.',
                         icon: Icons.check_circle_rounded,
                         accentColor: WhatsAppTheme.primaryTeal,
                       );
@@ -1404,113 +1409,128 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ),
             // Messages list with WhatsApp E2EE banner at top
             Expanded(
-              child: StreamBuilder<List<Message>>(
-                stream: _messagesStream ?? chatService.streamMessages(widget.chat.id),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+              child: StreamBuilder<Chat?>(
+                stream: _chatStream ?? chatService.streamChat(widget.chat.id),
+                builder: (context, chatSnap) {
+                  final currentChat = chatSnap.data ?? widget.chat;
+                  final clearedTime = currentChat.getClearedAt(currentUser.uid);
 
-                  final allMessages = snapshot.data ?? [];
-                  final messages = _searchQuery.isEmpty
-                      ? allMessages
-                      : allMessages
-                          .where((m) =>
-                              m.text.toLowerCase().contains(_searchQuery) ||
-                              (m.fileName?.toLowerCase().contains(_searchQuery) ?? false))
-                          .toList();
+                  return StreamBuilder<List<Message>>(
+                    stream: _messagesStream ?? chatService.streamMessages(widget.chat.id),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                  // Deteksi pesan baru: scroll ke bawah hanya jika pengguna
-                  // sedang berada di posisi teratas (tidak sedang membaca riwayat lama).
-                  if (messages.length > _lastMessageCount) {
-                    final wasAtBottom = !_showScrollToBottom;
-                    _lastMessageCount = messages.length;
-                    if (wasAtBottom) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) _scrollToLatest();
-                      });
-                    }
-                  } else if (messages.length < _lastMessageCount) {
-                    _lastMessageCount = messages.length;
-                  }
+                      var allMessages = snapshot.data ?? [];
+                      // Saring pesan berdasarkan waktu clearedAt milik pengguna (model WhatsApp)
+                      if (clearedTime != null) {
+                        allMessages = allMessages
+                            .where((m) => m.createdAt.isAfter(clearedTime))
+                            .toList();
+                      }
 
-                  return Stack(
-                    children: [
-                      ListView.builder(
-                        reverse: true,
-                        controller: _scrollController,
-                        physics: const AlwaysScrollableScrollPhysics(
-                          parent: BouncingScrollPhysics(),
-                        ),
-                        cacheExtent: 600,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        itemCount: messages.length + 1, // +1 for E2EE Banner
-                        itemBuilder: (context, index) {
-                          if (index == messages.length) {
-                            return _buildE2EEBanner();
-                          }
-                          final msg = messages[index];
-                          final isMe = msg.senderId == currentUser.uid;
-                          return Dismissible(
-                            key: ValueKey('swipe_${msg.id}'),
-                            direction: DismissDirection.startToEnd,
-                            confirmDismiss: (direction) async {
-                              // Swipe to reply action
-                              HapticFeedback.selectionClick();
-                              setState(() {
-                                _replyingToMessage = msg;
-                              });
-                              return false; // don't delete
-                            },
-                            background: Container(
-                              alignment: Alignment.centerLeft,
-                              padding: const EdgeInsets.only(left: 20),
-                              child: const Icon(Icons.reply_rounded, color: WhatsAppTheme.primaryTeal, size: 28),
+                      final messages = _searchQuery.isEmpty
+                          ? allMessages
+                          : allMessages
+                              .where((m) =>
+                                  m.text.toLowerCase().contains(_searchQuery) ||
+                                  (m.fileName?.toLowerCase().contains(_searchQuery) ?? false))
+                              .toList();
+
+                      // Deteksi pesan baru: scroll ke bawah hanya jika pengguna
+                      // sedang berada di posisi teratas (tidak sedang membaca riwayat lama).
+                      if (messages.length > _lastMessageCount) {
+                        final wasAtBottom = !_showScrollToBottom;
+                        _lastMessageCount = messages.length;
+                        if (wasAtBottom) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) _scrollToLatest();
+                          });
+                        }
+                      } else if (messages.length < _lastMessageCount) {
+                        _lastMessageCount = messages.length;
+                      }
+
+                      return Stack(
+                        children: [
+                          ListView.builder(
+                            reverse: true,
+                            controller: _scrollController,
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
                             ),
-                            child: _WhatsAppMessageBubble(
-                              message: msg,
-                              isMe: isMe,
-                              isGroup: widget.chat.isGroup,
-                              currentUserId: currentUser.uid,
-                              chatId: widget.chat.id,
-                              onReply: () {
-                                setState(() {
-                                  _replyingToMessage = msg;
-                                });
-                              },
-                            ),
-                          );
-                        },
-                      ),
-                      // Tombol scroll ke pesan terbaru
-                      Positioned(
-                        right: 12,
-                        bottom: 12,
-                        child: AnimatedSlide(
-                          offset: _showScrollToBottom ? Offset.zero : const Offset(0, 1.6),
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          child: AnimatedOpacity(
-                            opacity: _showScrollToBottom ? 1 : 0,
-                            duration: const Duration(milliseconds: 220),
-                            child: IgnorePointer(
-                              ignoring: !_showScrollToBottom,
-                              child: FloatingActionButton.small(
-                                heroTag: 'scroll_to_bottom',
-                                backgroundColor: WhatsAppTheme.darkSurface,
-                                foregroundColor: WhatsAppTheme.primaryTeal,
-                                elevation: 3,
-                                onPressed: () {
+                            cacheExtent: 600,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            itemCount: messages.length + 1, // +1 for E2EE Banner
+                            itemBuilder: (context, index) {
+                              if (index == messages.length) {
+                                return _buildE2EEBanner();
+                              }
+                              final msg = messages[index];
+                              final isMe = msg.senderId == currentUser.uid;
+                              return Dismissible(
+                                key: ValueKey('swipe_${msg.id}'),
+                                direction: DismissDirection.startToEnd,
+                                confirmDismiss: (direction) async {
+                                  // Swipe to reply action
                                   HapticFeedback.selectionClick();
-                                  _scrollToLatest();
+                                  setState(() {
+                                    _replyingToMessage = msg;
+                                  });
+                                  return false; // don't delete
                                 },
-                                child: const Icon(Icons.keyboard_double_arrow_down_rounded),
+                                background: Container(
+                                  alignment: Alignment.centerLeft,
+                                  padding: const EdgeInsets.only(left: 20),
+                                  child: const Icon(Icons.reply_rounded, color: WhatsAppTheme.primaryTeal, size: 28),
+                                ),
+                                child: _WhatsAppMessageBubble(
+                                  message: msg,
+                                  isMe: isMe,
+                                  isGroup: widget.chat.isGroup,
+                                  currentUserId: currentUser.uid,
+                                  chatId: widget.chat.id,
+                                  onReply: () {
+                                    setState(() {
+                                      _replyingToMessage = msg;
+                                    });
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                          // Tombol scroll ke pesan terbaru
+                          Positioned(
+                            right: 12,
+                            bottom: 12,
+                            child: AnimatedSlide(
+                              offset: _showScrollToBottom ? Offset.zero : const Offset(0, 1.6),
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              child: AnimatedOpacity(
+                                opacity: _showScrollToBottom ? 1 : 0,
+                                duration: const Duration(milliseconds: 220),
+                                child: IgnorePointer(
+                                  ignoring: !_showScrollToBottom,
+                                  child: FloatingActionButton.small(
+                                    heroTag: 'scroll_to_bottom',
+                                    backgroundColor: WhatsAppTheme.darkSurface,
+                                    foregroundColor: WhatsAppTheme.primaryTeal,
+                                    elevation: 3,
+                                    onPressed: () {
+                                      HapticFeedback.selectionClick();
+                                      _scrollToLatest();
+                                    },
+                                    child: const Icon(Icons.keyboard_double_arrow_down_rounded),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      );
+                    },
                   );
                 },
               ),

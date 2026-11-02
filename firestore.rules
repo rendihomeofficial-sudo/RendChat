@@ -50,9 +50,10 @@ service cloud.firestore {
                            'participantAvatars',
                            'pinnedBy',
                            'archivedBy',
-                           'lockedBy'
+                           'lockedBy',
+                           'clearedAt'
                          ]);
-      allow delete: if isSignedIn() && resource.data.createdBy == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.createdBy == request.auth.uid || isChatParticipant(chatId));
 
       match /messages/{messageId} {
         allow read: if isChatParticipant(chatId);
@@ -68,7 +69,7 @@ service cloud.firestore {
                         (request.resource.data.diff(resource.data).affectedKeys()
                               .hasOnly(['reactions', 'readBy', 'deliveryStatus', 'status', 'starredBy', 'pollVotes', 'viewedBy']))
                       );
-        allow delete: if isChatParticipant(chatId) && resource.data.senderId == request.auth.uid;
+        allow delete: if isChatParticipant(chatId);
       }
 
       match /typing/{uid} {

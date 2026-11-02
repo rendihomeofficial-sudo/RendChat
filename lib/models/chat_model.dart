@@ -21,6 +21,9 @@ class Chat {
   final List<String> archivedBy;
   final List<String> lockedBy;
 
+  // WhatsApp Clear Chat: clearedAt timestamp per-user (userId -> DateTime)
+  final Map<String, DateTime> clearedAt;
+
   const Chat({
     required this.id,
     required this.isGroup,
@@ -39,6 +42,7 @@ class Chat {
     this.pinnedBy = const [],
     this.archivedBy = const [],
     this.lockedBy = const [],
+    this.clearedAt = const {},
   });
 
   factory Chat.fromFirestore(
@@ -49,6 +53,13 @@ class Chat {
     final namesRaw = data['participantNames'] as Map<String, dynamic>? ?? {};
     final avatarsRaw = data['participantAvatars'] as Map<String, dynamic>? ?? {};
     final unreadRaw = data['unread'] as Map<String, dynamic>? ?? {};
+    final clearedAtRaw = data['clearedAt'] as Map<String, dynamic>? ?? {};
+    final clearedAt = <String, DateTime>{};
+    clearedAtRaw.forEach((k, v) {
+      if (v != null) {
+        clearedAt[k] = _parseDateTime(v);
+      }
+    });
 
     return Chat(
       id: snapshot.id,
@@ -68,6 +79,7 @@ class Chat {
       pinnedBy: (data['pinnedBy'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
       archivedBy: (data['archivedBy'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
       lockedBy: (data['lockedBy'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      clearedAt: clearedAt,
     );
   }
 
@@ -89,12 +101,20 @@ class Chat {
       'pinnedBy': pinnedBy,
       'archivedBy': archivedBy,
       'lockedBy': lockedBy,
+      'clearedAt': clearedAt.map((k, v) => MapEntry(k, Timestamp.fromDate(v))),
     };
   }
 
   bool isPinnedBy(String userId) => pinnedBy.contains(userId);
   bool isArchivedBy(String userId) => archivedBy.contains(userId);
   bool isLockedBy(String userId) => lockedBy.contains(userId);
+
+  DateTime? getClearedAt(String userId) => clearedAt[userId];
+  bool isMessageVisibleFor(String userId, DateTime messageCreatedAt) {
+    final clearedTime = clearedAt[userId];
+    if (clearedTime == null) return true;
+    return messageCreatedAt.isAfter(clearedTime);
+  }
 
   String getDisplayTitle(String currentUserId) {
     if (isGroup) {

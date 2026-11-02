@@ -1761,8 +1761,13 @@ class _WhatsAppChatTile extends StatelessWidget {
     final otherUid = chat.getOtherUserId(currentUserId);
     final chatService = context.read<ChatService>();
 
+    final clearedTime = chat.getClearedAt(currentUserId);
+    final isClearedForMe = clearedTime != null &&
+        chat.lastMessageAt != null &&
+        !chat.lastMessageAt!.isAfter(clearedTime);
+
     String timeStr = '';
-    if (chat.lastMessageAt != null) {
+    if (chat.lastMessageAt != null && !isClearedForMe) {
       final now = DateTime.now();
       final msgDate = chat.lastMessageAt!;
       if (now.difference(msgDate).inDays == 0) {
@@ -1994,12 +1999,17 @@ class _WhatsAppChatTile extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                chat.lastMessage ?? 'Say hello!',
+                isClearedForMe
+                    ? 'Obrolan telah dibersihkan'
+                    : (chat.lastMessage ?? 'Say hello!'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 14,
-                  color: unreadCount > 0 ? WhatsAppTheme.darkTextPrimary : WhatsAppTheme.darkTextSecondary,
+                  fontStyle: isClearedForMe ? FontStyle.italic : FontStyle.normal,
+                  color: isClearedForMe
+                      ? WhatsAppTheme.darkTextSecondary.withValues(alpha: 0.6)
+                      : (unreadCount > 0 ? WhatsAppTheme.darkTextPrimary : WhatsAppTheme.darkTextSecondary),
                   fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
                 ),
               ),
