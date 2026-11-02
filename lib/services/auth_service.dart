@@ -221,7 +221,15 @@ class AuthService extends ChangeNotifier {
     if (statusMessage != null) updates['statusMessage'] = statusMessage.trim();
     if (photoURL != null) {
       updates['photoURL'] = photoURL;
-      await _firebaseUser!.updatePhotoURL(photoURL);
+      // Firebase User updatePhotoURL hanya mendukung format HTTP/HTTPS URL
+      // Data URI Base64 tidak didukung oleh Firebase Auth internal dan akan melempar exception
+      if (photoURL.startsWith('http://') || photoURL.startsWith('https://')) {
+        try {
+          await _firebaseUser!.updatePhotoURL(photoURL);
+        } catch (e) {
+          debugPrint('Firebase Auth updatePhotoURL skipped: $e');
+        }
+      }
     }
 
     if (updates.isNotEmpty) {

@@ -30,8 +30,8 @@ class SettingsService extends ChangeNotifier {
   String _chatWallpaper = 'Default Doodle';
   String _lastBackupTime = 'Belum pernah';
   String _appLanguage = 'English';
-  int _netSentBytes = 2548000;
-  int _netRecvBytes = 4120000;
+  int _netSentBytes = 0;
+  int _netRecvBytes = 0;
 
   ThemeMode get themeMode => _themeMode;
   String get themeModeString => _themeModeString;
@@ -90,8 +90,8 @@ class SettingsService extends ChangeNotifier {
       final lang = prefs.getString(_appLanguageKey);
       if (lang != null) _appLanguage = lang;
 
-      _netSentBytes = prefs.getInt(_netSentBytesKey) ?? 2548000;
-      _netRecvBytes = prefs.getInt(_netRecvBytesKey) ?? 4120000;
+      _netSentBytes = prefs.getInt(_netSentBytesKey) ?? 0;
+      _netRecvBytes = prefs.getInt(_netRecvBytesKey) ?? 0;
 
       notifyListeners();
     } catch (e) {
@@ -169,6 +169,15 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_lastBackupKey, formatted);
+  }
+
+  Future<void> recordNetworkUsage({int sentBytes = 0, int recvBytes = 0}) async {
+    _netSentBytes += sentBytes;
+    _netRecvBytes += recvBytes;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_netSentBytesKey, _netSentBytes);
+    await prefs.setInt(_netRecvBytesKey, _netRecvBytes);
   }
 
   Future<void> resetNetworkStats() async {

@@ -51,21 +51,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _twoStepEnabled = false;
 
   Future<void> _pickAvatar() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: WhatsAppTheme.darkSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 10),
+              child: Text(
+                'Foto Profil',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded, color: WhatsAppTheme.primaryTeal),
+              title: const Text('Kamera', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Ambil foto langsung dengan kamera', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _processAvatarPick(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: WhatsAppTheme.primaryTeal),
+              title: const Text('Galeri', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Pilih foto dari penyimpanan perangkat', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _processAvatarPick(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _processAvatarPick(ImageSource source) async {
     final auth = context.read<AuthService>();
     final storage = context.read<StorageService>();
     final uid = auth.currentUid;
     if (uid == null) return;
 
-    final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 720,
-      maxHeight: 720,
-      imageQuality: 80,
-    );
-    if (picked == null) return;
-
-    setState(() => _isSaving = true);
     try {
+      final picked = await _picker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 75,
+      );
+      if (picked == null) return;
+
+      setState(() => _isSaving = true);
+      showPremiumNotificationToast(
+        context,
+        title: 'Memperbarui Foto Profil',
+        message: 'Sedang mengunggah dan mengoptimalkan gambar...',
+        icon: Icons.sync_rounded,
+        accentColor: WhatsAppTheme.primaryTeal,
+      );
+
       final bytes = await picked.readAsBytes();
       final url = await storage.uploadAvatar(
         uid: uid,
@@ -75,6 +124,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (url != null) {
         await auth.updateProfile(photoURL: url);
+        if (mounted) {
+          showPremiumNotificationToast(
+            context,
+            title: 'Foto Profil Berhasil Diperbarui',
+            message: 'Tampilan profil Anda kini telah diperbarui secara langsung.',
+            icon: Icons.check_circle_rounded,
+            accentColor: WhatsAppTheme.primaryTeal,
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        showPremiumNotificationToast(
+          context,
+          title: 'Gagal Memperbarui Profil',
+          message: e.toString().replaceAll('Exception: ', ''),
+          icon: Icons.error_outline_rounded,
+          accentColor: Colors.redAccent,
+        );
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -864,10 +932,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ListTile(
               leading: const Icon(Icons.cloud_upload_outlined, color: WhatsAppTheme.primaryTeal),
               title: const Text('Chat backup'),
-              subtitle: const Text('Last backup: Today, 2:00 AM (Cloud Firestore synced)', style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
+              subtitle: const Text('Cloud Firestore auto-sync realtime', style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
               onTap: () {
                 Navigator.pop(ctx);
                 _showChatBackupDialog();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.history_rounded, color: WhatsAppTheme.darkTextSecondary),
+              title: const Text('Chat history'),
+              subtitle: const Text('Bersihkan atau hapus seluruh riwayat obrolan', style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showChatHistoryDialog();
               },
             ),
           ],
@@ -950,6 +1027,67 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  void _showChatHistoryDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: WhatsAppTheme.darkSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('Chat history', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_sweep_rounded, color: Colors.amberAccent),
+              title: const Text('Bersihkan semua pesan', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Hapus isi teks seluruh percakapan Anda', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (dCtx) => AlertDialog(
+                    backgroundColor: WhatsAppTheme.darkSurface,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    title: const Text('Bersihkan Semua Obrolan?'),
+                    content: const Text('Semua pesan pada seluruh daftar chat Anda akan dihapus permanen.'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Batal')),
+                      FilledButton(
+                        style: FilledButton.styleFrom(backgroundColor: Colors.amber[700]),
+                        onPressed: () => Navigator.pop(dCtx, true),
+                        child: const Text('Bersihkan Semua'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true && mounted) {
+                  final auth = context.read<AuthService>();
+                  final uid = auth.currentUid;
+                  if (uid != null) {
+                    await context.read<ChatService>().clearAllChatsForUser(uid);
+                    if (mounted) {
+                      showPremiumNotificationToast(
+                        context,
+                        title: 'Semua Chat Dibersihkan',
+                        message: 'Seluruh percakapan telah dikosongkan.',
+                        icon: Icons.check_circle_rounded,
+                        accentColor: WhatsAppTheme.primaryTeal,
+                      );
+                    }
+                  }
+                }
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1202,13 +1340,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showNetworkUsageDialog() {
     final settings = context.read<SettingsService>();
-    final sentKb = (settings.netSentBytes / 1024).toStringAsFixed(1);
-    final recvKb = (settings.netRecvBytes / 1024).toStringAsFixed(1);
+    String formatBytes(int bytes) {
+      if (bytes < 1024) return '$bytes B';
+      if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+    }
+
+    final sentFormatted = formatBytes(settings.netSentBytes);
+    final recvFormatted = formatBytes(settings.netRecvBytes);
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: WhatsAppTheme.darkSurface,
-        title: const Text('Network usage'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.data_usage_rounded, color: WhatsAppTheme.primaryTeal),
+            SizedBox(width: 8),
+            Text('Network usage'),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1216,19 +1368,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
               dense: true,
               leading: const Icon(Icons.call_rounded, color: WhatsAppTheme.primaryTeal),
               title: const Text('Calls & Media'),
-              trailing: Text('$sentKb KB sent • $recvKb KB rec\'d', style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+              trailing: Text(
+                '$sentFormatted sent • $recvFormatted rec\'d',
+                style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary),
+              ),
             ),
             ListTile(
               dense: true,
               leading: const Icon(Icons.photo_rounded, color: WhatsAppTheme.primaryTeal),
               title: const Text('Media & Files'),
-              trailing: Text('${(settings.netSentBytes * 0.4 / 1024).toStringAsFixed(1)} KB sent', style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+              trailing: Text(
+                formatBytes((settings.netSentBytes * 0.6).toInt()),
+                style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary),
+              ),
             ),
-            ListTile(
+            const ListTile(
               dense: true,
-              leading: const Icon(Icons.chat_bubble_rounded, color: WhatsAppTheme.primaryTeal),
-              title: const Text('Messages & Statuses'),
-              trailing: const Text('Cloud Firestore Realtime', style: TextStyle(fontSize: 12, color: WhatsAppTheme.primaryTeal)),
+              leading: Icon(Icons.chat_bubble_rounded, color: WhatsAppTheme.primaryTeal),
+              title: Text('Messages & Statuses'),
+              trailing: Text(
+                'Firestore Cloud Synced',
+                style: TextStyle(fontSize: 12, color: WhatsAppTheme.primaryTeal),
+              ),
             ),
           ],
         ),
@@ -1238,15 +1399,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Navigator.pop(ctx);
               await settings.resetNetworkStats();
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Statistik jaringan berhasil direset')),
+                showPremiumNotificationToast(
+                  context,
+                  title: 'Statistik Direset',
+                  message: 'Penghitung penggunaan jaringan dikembalikan ke 0 B.',
+                  icon: Icons.refresh_rounded,
+                  accentColor: WhatsAppTheme.primaryTeal,
                 );
               }
             },
             child: const Text('Reset statistics', style: TextStyle(color: Colors.redAccent)),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+            style: FilledButton.styleFrom(
+              backgroundColor: WhatsAppTheme.primaryTeal,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             onPressed: () => Navigator.pop(ctx),
             child: const Text('OK'),
           ),

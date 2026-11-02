@@ -687,19 +687,54 @@ class _ChatScreenState extends State<ChatScreen> {
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: WhatsAppTheme.darkSurface,
-            title: const Text('Clear this chat?'),
-            content: const Text('Messages will be removed from this conversation.'),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.delete_sweep_rounded, color: Colors.redAccent),
+                SizedBox(width: 8),
+                Text('Bersihkan Obrolan Ini?'),
+              ],
+            ),
+            content: const Text(
+              'Seluruh riwayat pesan di percakapan ini akan dihapus secara permanen dari server dan perangkat Anda.',
+              style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13.5, height: 1.35),
+            ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Batal', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+              ),
               FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-                onPressed: () {
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () async {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Chat cleared')),
-                  );
+                  try {
+                    await context.read<ChatService>().clearChat(widget.chat.id);
+                    if (mounted) {
+                      showPremiumNotificationToast(
+                        context,
+                        title: 'Obrolan Dibersihkan',
+                        message: 'Semua pesan dalam percakapan ini telah dihapus.',
+                        icon: Icons.check_circle_rounded,
+                        accentColor: WhatsAppTheme.primaryTeal,
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      showPremiumNotificationToast(
+                        context,
+                        title: 'Gagal Membersihkan',
+                        message: e.toString().replaceAll('Exception: ', ''),
+                        icon: Icons.error_outline_rounded,
+                        accentColor: Colors.redAccent,
+                      );
+                    }
+                  }
                 },
-                child: const Text('Clear chat'),
+                child: const Text('Bersihkan'),
               ),
             ],
           ),

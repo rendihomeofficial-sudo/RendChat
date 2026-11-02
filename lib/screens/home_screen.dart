@@ -19,6 +19,8 @@ import '../services/lock_chat_passcode_manager.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/chat_feedback_widgets.dart';
+import 'camera_qr_scanner_screen.dart';
+import 'media_status_composer_screen.dart';
 import 'chat_screen.dart';
 import 'contacts_screen.dart';
 import 'new_group_screen.dart';
@@ -60,12 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final ImagePicker _picker = ImagePicker();
 
   Future<void> _captureAndPostMediaStatus({bool fromCamera = true, bool isVideo = false}) async {
-    final auth = context.read<AuthService>();
-    final chatService = context.read<ChatService>();
-    final storageService = context.read<StorageService>();
-    final user = auth.appUser;
-    if (user == null) return;
-
     try {
       XFile? picked;
       if (isVideo) {
@@ -84,61 +80,23 @@ class _HomeScreenState extends State<HomeScreen> {
       if (picked == null) return;
 
       if (!mounted) return;
-      showPremiumNotificationToast(
+      // Buka editor/composer media status untuk menambahkan Caption & Emotion
+      await Navigator.push<bool>(
         context,
-        title: isVideo ? 'Mengunggah Video HD' : 'Mengunggah Foto HD',
-        message: 'Sedang memproses dan mengunggah status ke server...',
-        icon: isVideo ? Icons.videocam_rounded : Icons.photo_camera_rounded,
-        accentColor: WhatsAppTheme.primaryTeal,
+        MaterialPageRoute(
+          builder: (_) => MediaStatusComposerScreen(
+            file: picked!,
+            isVideo: isVideo,
+          ),
+        ),
       );
-
-      final bytes = await picked.readAsBytes();
-      final url = await storageService.uploadStatusMedia(
-        userId: user.uid,
-        filePath: picked.path,
-        fileBytes: bytes,
-        fileName: picked.name,
-      );
-
-      if (url != null) {
-        await chatService.postStatus(
-          userId: user.uid,
-          userName: user.displayName,
-          userAvatar: user.photoURL,
-          text: isVideo ? '📹 Video Status' : '',
-          mediaUrl: url,
-          backgroundColor: 0xFF000000,
-        );
-
-        if (mounted) {
-          showPremiumNotificationToast(
-            context,
-            title: 'Status Terkirim!',
-            message: isVideo ? 'Status video HD Anda berhasil dipublikasikan.' : 'Status foto HD Anda berhasil dipublikasikan.',
-            icon: Icons.check_circle_rounded,
-            accentColor: WhatsAppTheme.primaryTeal,
-          );
-        }
-      } else {
-        if (mounted) {
-          showPremiumNotificationToast(
-            context,
-            title: 'Gagal Mengunggah',
-            message: isVideo
-                ? 'Ukuran video melebihi batas yang didukung server (maks 1 MB). Silakan gunakan video yang lebih pendek.'
-                : 'Ukuran foto melebihi batas server. Silakan coba pilih kembali fotonya.',
-            icon: Icons.error_outline_rounded,
-            accentColor: const Color(0xFFEF4444),
-          );
-        }
-      }
     } catch (e) {
-      debugPrint('Error uploading media status: $e');
+      debugPrint('Error selecting media status: $e');
       if (mounted) {
         showPremiumNotificationToast(
           context,
           title: 'Terjadi Kesalahan',
-          message: 'Gagal membuat status: $e',
+          message: 'Gagal memilih media: $e',
           icon: Icons.error_outline_rounded,
           accentColor: const Color(0xFFEF4444),
         );

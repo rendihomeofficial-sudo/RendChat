@@ -451,14 +451,22 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
               if (widget.statusText.isNotEmpty)
                 widget.mediaUrl != null
                     ? Positioned(
-                        bottom: 84,
+                        bottom: isMyStatus ? 28 : 84,
                         left: 16,
                         right: 16,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            borderRadius: BorderRadius.circular(16),
+                            color: Colors.black.withValues(alpha: 0.72),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: Colors.white12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
                           ),
                           child: Text(
                             widget.statusText,
@@ -467,6 +475,7 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
+                              height: 1.3,
                             ),
                           ),
                         ),
