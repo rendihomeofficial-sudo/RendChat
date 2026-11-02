@@ -1,8 +1,8 @@
 {
-  "version": "1.3.11",
-  "version_code": 24,
-  "title": "RenChat v1.3.11 - Live Hardware CameraPreview PIP, Sensor Kamera Depan/Belakang, & Izin Lengkap GPS/Audio",
-  "release_notes": "• Integrasi Sensor Kamera Fisik Nyata: Menggunakan CameraController & CameraPreview langsung dari package camera Flutter pada jendela PIP self-view.\n• Swap Kamera Depan/Belakang: Tombol flip kamera memutar lensa seketika dengan preview hardware langsung.\n• Izin Lengkap AndroidManifest: Menambahkan GPS (ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION), hardware audio (MODIFY_AUDIO_SETTINGS), getar (VIBRATE), wake lock panggilan, dan media storage Android 13+.\n• minSdk disesuaikan ke 21 untuk kompatibilitas penuh native camera Flutter di seluruh perangkat Android.",
+  "version": "1.3.12",
+  "version_code": 25,
+  "title": "RenChat v1.3.12 - Set Izin AndroidManifest Lengkap (GPS, Audio Hardware, Media Storage) & Live CameraPreview PIP",
+  "release_notes": "• Set Izin Lengkap Android: Penambahan izin GPS Presisi (ACCESS_FINE_LOCATION & ACCESS_COARSE_LOCATION) untuk Live Location chat, kontrol audio hardware (MODIFY_AUDIO_SETTINGS), wake lock panggilan, getar (VIBRATE), dan full-screen intent saat layar terkunci.\n• Penyimpanan & Media Universal: Dukungan menyeluruh media gambar, video, dan audio untuk Android versi lama hingga Android 13/14/15.\n• Sensor Kamera Fisik Nyata: CameraController & CameraPreview hardware aktif langsung di jendela PIP self-view saat VC atau swap panggilan.\n• Kompatibilitas Menyeluruh: Pengaturan minSdk 21 untuk kestabilan native camera dan audio streaming di seluruh perangkat.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
