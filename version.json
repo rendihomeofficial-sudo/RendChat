@@ -1,8 +1,8 @@
 {
-  "version": "1.3.16",
-  "version_code": 29,
-  "title": "RenChat v1.3.16 - Penyempurnaan Navigasi Kamera QR, Papan Klip & Info Lisensi",
-  "release_notes": "• Tombol Tautkan Perangkat (Linked Devices): Menghubungkan langsung tombol 'Link a device' ke pemindai kamera barcode & QR code (CameraQrScannerScreen).\n• Fungsionalitas Salin Tautan Panggilan & Status: Menambahkan Clipboard.setData pada dialog tautan panggilan beranda, lembar panggilan aktif, dan penampil status agar link benar-benar tersalin ke papan klip.\n• Informasi Versi & Lisensi Resmi: Mengintegrasikan versi live aplikasi ke menu Info Aplikasi serta mengaktifkan tombol Lisensi resmi perangkat lunak Flutter (showLicensePage).",
+  "version": "1.3.17",
+  "version_code": 30,
+  "title": "RenChat v1.3.17 - Saluran Notifikasi Prioritas Tinggi & Sinkronisasi Riwayat Panggilan",
+  "release_notes": "• Saluran Notifikasi Prioritas Tinggi (Android): Menginisialisasi saluran 'Pesan Obrolan' dan 'Panggilan Masuk' secara eksplisit di MainActivity dengan IMPORTANCE_HIGH dan VISIBILITY_PUBLIC untuk keandalan banner heads-up serta layar terkunci.\n• Sinkronisasi Riwayat Panggilan Cepat: Memperbarui CallHistoryManager secara langsung saat panggilan ditolak, diakhiri, atau tak terjawab oleh pihak lawan.\n• Pemindai QR & Salin Tautan: Akses kamera instan pada tautan perangkat dan tombol salin tautan panggilan/status ke papan klip sistem.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
