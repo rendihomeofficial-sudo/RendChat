@@ -352,7 +352,6 @@ class _HomeScreenState extends State<HomeScreen> {
         // Jika sedang di tab lain selain Chats (tab 0), kembali ke tab Chats alih-alih keluar aplikasi
         setState(() {
           _currentTabIndex = 0;
-          _tabController.animateTo(0);
         });
       },
       child: Scaffold(
