@@ -56,6 +56,7 @@ class AppUpdateService extends ChangeNotifier {
       'https://api.github.com/repos/rendihomeofficial-sudo/RendChat/releases/latest';
 
   AppUpdateInfo? _updateInfo;
+  AppUpdateInfo? _latestReleaseInfo;
   bool _isChecking = false;
   bool _hasCheckedThisSession = false;
   String? _lastError;
@@ -70,6 +71,7 @@ class AppUpdateService extends ChangeNotifier {
   String? _downloadedApkPath;
 
   AppUpdateInfo? get updateInfo => _updateInfo;
+  AppUpdateInfo? get latestReleaseInfo => _latestReleaseInfo;
   bool get hasUpdate => _updateInfo != null;
   bool get isChecking => _isChecking;
   String? get lastError => _lastError;
@@ -109,6 +111,7 @@ class AppUpdateService extends ChangeNotifier {
     try {
       await _loadLocalVersion();
       final info = await _fetchLatestVersionInfo();
+      _latestReleaseInfo = info;
 
       if (info == null) {
         _updateInfo = null;

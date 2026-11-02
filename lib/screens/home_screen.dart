@@ -1234,44 +1234,55 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: WhatsAppTheme.darkChatBg,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                        Consumer<AppUpdateService>(
+                          builder: (context, updateService, _) {
+                            final liveInfo = updateService.latestReleaseInfo ?? updateService.updateInfo;
+                            final versionLabel = liveInfo != null
+                                ? 'v${liveInfo.version} Live'
+                                : 'v1.3.14 Live';
+                            final releaseNotes = liveInfo?.releaseNotes != null && liveInfo!.releaseNotes.isNotEmpty
+                                ? liveInfo.releaseNotes
+                                : '📢 Catatan Rilis Resmi RenChat:\n'
+                                  '• Bisukan Notifikasi Nyata (Mute): Opsi menu dan pengaturan kontak kini menyimpan status durasi bisu (8 Jam, 1 Minggu, atau Selalu) langsung ke Cloud Firestore.\n'
+                                  '• Pesan Sementara Interaktif (Disappearing Messages): Pilihan durasi hapus otomatis (24 Jam, 7 Hari, 90 Hari, atau Mati) tersimpan dan tersinkronisasi di obrolan.\n'
+                                  '• Pembersihan Obrolan Model WhatsApp: clearedAt per-user menjaga pesan tetap bersih di perangkat Anda tanpa menghapus riwayat obrolan lawan bicara.\n'
+                                  '• Kamera Fisik Nyata Video Call PIP: CameraController mengontrol sensor optik kamera depan secara nyata.';
+
+                            return Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: WhatsAppTheme.darkChatBg,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Text(
-                                      'VERSI TERBARU',
-                                      style: TextStyle(color: WhatsAppTheme.primaryTeal, fontSize: 10.5, fontWeight: FontWeight.bold),
-                                    ),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Text(
+                                          'VERSI TERBARU',
+                                          style: TextStyle(color: WhatsAppTheme.primaryTeal, fontSize: 10.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(versionLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                    ],
                                   ),
-                                  const SizedBox(width: 8),
-                                  const Text('v1.3.8 Live', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    releaseNotes,
+                                    style: const TextStyle(fontSize: 12.5, color: Colors.white70, height: 1.4),
+                                  ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                '📢 Catatan Rilis Resmi RenChat:\n'
-                                '• Status Realtime Typing yang responsif & akurat tanpa status palsu.\n'
-                                '• Kustomisasi wallpaper chat dengan foto pribadi dari Galeri Anda.\n'
-                                '• Sistem Panggilan Telepon cerdas: nada panggil berdering hanya jika penerima online/terhubung.\n'
-                                '• Manajemen Komunitas: pembuat & admin dapat menghapus komunitas.\n'
-                                '• Antarmuka Bahasa Indonesia baku dan animasi ultra smooth.',
-                                style: TextStyle(fontSize: 12.5, color: Colors.white70, height: 1.4),
-                              ),
-                            ],
-                          ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 10),
                         Row(
