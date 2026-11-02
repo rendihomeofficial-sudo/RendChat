@@ -48,6 +48,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   StreamSubscription<CallModel?>? _callStatusSub;
   StreamSubscription<AppUser?>? _receiverPresenceSub;
   String? _activeCallId;
+  bool _hasExited = false; // Mencegah double-pop yang memicu blank screen hitam
 
   // Real Microphone Input Stream untuk audio live tanpa delay
   late final AudioRecorder _liveAudioRecorder;
@@ -278,11 +279,28 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
         _startTimer();
       } else if (call.status == 'rejected' || call.status == 'ended' || call.status == 'missed') {
         _stopCallingSound();
-        if (mounted) {
-          Navigator.pop(context);
-        }
+        _safeExitCall();
       }
     });
+  }
+
+  void _safeExitCall({String? snackBarMessage}) {
+    if (_hasExited) return;
+    _hasExited = true;
+    _connectTimer?.cancel();
+    _callTimer?.cancel();
+    _stopCallingSound();
+
+    if (mounted) {
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      if (snackBarMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(snackBarMessage)),
+        );
+      }
+    }
   }
 
   Future<void> _initiateFirestoreCall() async {
@@ -474,9 +492,16 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF101D24),
-      body: Stack(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _endCallInFirestore();
+        _safeExitCall();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF101D24),
+        body: Stack(
         children: [
           // Background: Fullscreen video or WhatsApp dark gradient
           if (_isVideo && !_isVideoOff)
@@ -498,10 +523,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                         icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 32),
                         tooltip: 'Minimize call',
                         onPressed: () {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Call running in background')),
-                          );
+                          _safeExitCall(snackBarMessage: 'Call running in background');
                         },
                       ),
                       const Spacer(),
@@ -618,6 +640,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
           if (_isVideo && !_isVideoOff)
             _buildDraggablePip(context),
         ],
+      ),
       ),
     );
   }
@@ -998,19 +1021,11 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
               // Red End Call Button
               GestureDetector(
                 onTap: () {
-                  _connectTimer?.cancel();
-                  _callTimer?.cancel();
                   _endCallInFirestore();
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        _isConnected
-                            ? 'Panggilan berakhir • Durasi ${_formatDuration(_callSeconds)}'
-                            : 'Panggilan dibatalkan',
-                      ),
-                    ),
-                  );
+                  final msg = _isConnected
+                      ? 'Panggilan berakhir • Durasi ${_formatDuration(_callSeconds)}'
+                      : 'Panggilan dibatalkan';
+                  _safeExitCall(snackBarMessage: msg);
                 },
                 child: Container(
                   width: 56,

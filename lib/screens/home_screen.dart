@@ -222,6 +222,10 @@ class _HomeScreenState extends State<HomeScreen> {
         _showingCallId = incoming.id;
         RingtoneService.instance.startIncomingRingtone();
         _showIncomingCallDialog(incoming);
+      } else if (incoming == null && _showingCallId != null) {
+        // Panggilan dibatalkan oleh pemanggil sebelum diangkat
+        RingtoneService.instance.stopRingtone();
+        _showingCallId = null;
       }
     });
   }
@@ -341,9 +345,19 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return Scaffold(
-      appBar: _buildAppBar(context, currentUser),
-      body: Column(
+    return PopScope(
+      canPop: _currentTabIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        // Jika sedang di tab lain selain Chats (tab 0), kembali ke tab Chats alih-alih keluar aplikasi
+        setState(() {
+          _currentTabIndex = 0;
+          _tabController.animateTo(0);
+        });
+      },
+      child: Scaffold(
+        appBar: _buildAppBar(context, currentUser),
+        body: Column(
         children: [
           // Banner popup otomatis saat versi baru tersedia di GitHub.
           const UpdateBanner(),
@@ -412,6 +426,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       floatingActionButton: _buildFab(context),
+    ),
     );
   }
 
