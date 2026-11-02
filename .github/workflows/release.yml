@@ -95,7 +95,10 @@ jobs:
           echo "Listing all generated APK files:"
           find build/ -name "*.apk" || true
 
-          APK_SOURCE=$(find build/ -name "*.apk" ! -name "*unaligned*" ! -name "*uncompressed*" 2>/dev/null | head -n 1 || true)
+          APK_SOURCE=$(find build/app/outputs -name "*.apk" ! -name "*unaligned*" 2>/dev/null | head -n 1 || true)
+          if [ -z "$APK_SOURCE" ] || [ ! -f "$APK_SOURCE" ]; then
+            APK_SOURCE=$(find build/ -name "*.apk" ! -name "*unaligned*" 2>/dev/null | head -n 1 || true)
+          fi
 
           if [ -z "$APK_SOURCE" ] || [ ! -f "$APK_SOURCE" ]; then
             echo "Error: release APK not found in build directory!"
