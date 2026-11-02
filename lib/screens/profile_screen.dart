@@ -1675,7 +1675,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ListTile(
               leading: const Icon(Icons.info_outline_rounded, color: WhatsAppTheme.darkTextSecondary),
               title: const Text('App info'),
-              subtitle: const Text('RenChat v1.0.0 (GitHub: RendChat)', style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
+              subtitle: Builder(
+                builder: (context) {
+                  final updateService = context.watch<AppUpdateService>();
+                  return Text(
+                    'RenChat v${updateService.currentVersion} (Build ${updateService.currentVersionCode})',
+                    style: const TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12),
+                  );
+                },
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 _showAppInfoDialog();
@@ -1785,31 +1793,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showAppInfoDialog() {
+    final updateService = context.read<AppUpdateService>();
+    final currentVer = updateService.currentVersion;
+    final currentCode = updateService.currentVersionCode;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: WhatsAppTheme.darkSurface,
         title: const Center(child: Text('RenChat')),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
+            const CircleAvatar(
               radius: 36,
               backgroundColor: WhatsAppTheme.primaryTeal,
               child: Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 40),
             ),
-            SizedBox(height: 16),
-            Text('RenChat Messenger', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            SizedBox(height: 4),
-            Text('Version 2.24.21.79', style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13)),
-            SizedBox(height: 16),
-            Text('© 2026 RenChat Inc.', style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
+            const SizedBox(height: 16),
+            const Text('RenChat Messenger', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 4),
+            Text('Version $currentVer (Build $currentCode)', style: const TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13)),
+            const SizedBox(height: 16),
+            const Text('© 2026 RenChat Inc. • Cloud Realtime', style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
           ],
         ),
         actions: [
           Center(
             child: TextButton(
-              onPressed: () => Navigator.pop(ctx),
+              onPressed: () {
+                Navigator.pop(ctx);
+                showLicensePage(
+                  context: context,
+                  applicationName: 'RenChat',
+                  applicationVersion: 'v$currentVer (Build $currentCode)',
+                  applicationLegalese: '© 2026 RenChat Inc.',
+                );
+              },
               child: const Text('Licenses', style: TextStyle(color: WhatsAppTheme.primaryTeal)),
             ),
           ),

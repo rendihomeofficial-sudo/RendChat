@@ -298,6 +298,8 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
               leading: const Icon(Icons.share_outlined, color: Colors.white70),
               title: const Text('Bagikan...', style: TextStyle(color: Colors.white)),
               onTap: () {
+                final statusLink = 'https://renchat.com/status/${widget.statuses[_currentIndex].id}';
+                Clipboard.setData(ClipboardData(text: statusLink));
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Tautan status disalin ke papan klip.')),

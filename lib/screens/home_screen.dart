@@ -1576,8 +1576,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: const Text('Link a device'),
                 onPressed: () {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Point your phone camera to scan RenChat Web QR Code')),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CameraQrScannerScreen()),
                   );
                 },
               ),
@@ -1633,6 +1634,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.copy_rounded, size: 18),
             label: const Text('Copy link'),
             onPressed: () {
+              Clipboard.setData(ClipboardData(text: link));
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Call link copied to clipboard!')),

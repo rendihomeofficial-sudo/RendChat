@@ -477,6 +477,8 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                 title: const Text('Salin Tautan Panggilan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 subtitle: const Text('Siapa pun yang memiliki tautan dapat bergabung', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
                 onTap: () {
+                  final link = 'https://call.renchat.com/v1/${_activeCallId ?? DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
+                  Clipboard.setData(ClipboardData(text: link));
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Tautan panggilan RenChat disalin ke papan klip!')),
