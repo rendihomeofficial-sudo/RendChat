@@ -39,6 +39,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _lastSeenPrivacy = settings.lastSeenPrivacy;
     _profilePhotoPrivacy = settings.profilePhotoPrivacy;
     _aboutPrivacy = settings.aboutPrivacy;
+    _appLanguage = settings.appLanguage;
   }
   String _notificationTone = 'RenChat Ding (Default)';
   String _vibrateSetting = 'Default';
@@ -1254,46 +1255,132 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // 6. LANGUAGE SUB-MENU
+  // 6. LANGUAGE & TRANSLATE SETTINGS
   void _showAppLanguageDialog() {
-    showDialog(
+    final settings = SettingsService.instance;
+    final current = settings.appLanguage;
+
+    final languages = [
+      {'code': 'id', 'name': 'Bahasa Indonesia', 'native': 'Bahasa Indonesia (Default)'},
+      {'code': 'en', 'name': 'English', 'native': 'English (United States)'},
+      {'code': 'es', 'name': 'Español', 'native': 'Español (América Latina)'},
+      {'code': 'ar', 'name': 'العربية', 'native': 'العربية (Arabic)'},
+      {'code': 'ja', 'name': '日本語', 'native': '日本語 (Japanese)'},
+    ];
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppTheme.darkSurface,
-        title: const Text('App language'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(
-                _appLanguage.contains('Indonesia') ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                color: _appLanguage.contains('Indonesia') ? WhatsAppTheme.primaryTeal : WhatsAppTheme.darkTextSecondary,
-              ),
-              title: const Text('Bahasa Indonesia'),
-              subtitle: const Text('(device\'s language)', style: TextStyle(fontSize: 11)),
-              onTap: () {
-                setState(() => _appLanguage = 'Bahasa Indonesia');
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Bahasa aplikasi diubah ke Bahasa Indonesia')),
-                );
-              },
+      backgroundColor: WhatsAppTheme.darkSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      Icon(Icons.translate_rounded, color: WhatsAppTheme.primaryTeal, size: 24),
+                      SizedBox(width: 10),
+                      Text(
+                        'Bahasa Aplikasi & Terjemahan',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
+                  child: Text(
+                    'Pilih bahasa antarmuka dan preferensi terjemahan pesan instan di RenChat.',
+                    style: TextStyle(fontSize: 12.5, color: WhatsAppTheme.darkTextSecondary),
+                  ),
+                ),
+                const Divider(height: 1),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: languages.length,
+                    itemBuilder: (context, index) {
+                      final item = languages[index];
+                      final isSelected = current.toLowerCase().contains(item['name']!.toLowerCase()) ||
+                          _appLanguage.toLowerCase().contains(item['name']!.toLowerCase());
+
+                      return ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? WhatsAppTheme.primaryTeal.withValues(alpha: 0.15)
+                                : Colors.transparent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            isSelected ? Icons.check_circle_rounded : Icons.radio_button_off_rounded,
+                            color: isSelected ? WhatsAppTheme.primaryTeal : WhatsAppTheme.darkTextSecondary,
+                            size: 22,
+                          ),
+                        ),
+                        title: Text(
+                          item['name']!,
+                          style: TextStyle(
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? Colors.white : WhatsAppTheme.darkTextPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          item['native']!,
+                          style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary),
+                        ),
+                        trailing: isSelected
+                            ? const Text(
+                                'Aktif',
+                                style: TextStyle(
+                                  color: WhatsAppTheme.primaryTeal,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              )
+                            : null,
+                        onTap: () async {
+                          final newLang = item['name']!;
+                          await settings.setAppLanguage(newLang);
+                          setState(() => _appLanguage = newLang);
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (mounted) {
+                            showPremiumNotificationToast(
+                              context,
+                              title: 'Bahasa Diperbarui',
+                              message: 'Bahasa aplikasi berhasil diubah ke $newLang.',
+                              icon: Icons.language_rounded,
+                              accentColor: WhatsAppTheme.primaryTeal,
+                            );
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-            ListTile(
-              leading: Icon(
-                _appLanguage.contains('English') ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                color: _appLanguage.contains('English') ? WhatsAppTheme.primaryTeal : WhatsAppTheme.darkTextSecondary,
-              ),
-              title: const Text('English'),
-              onTap: () {
-                setState(() => _appLanguage = 'English');
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('App language set to English')),
-                );
-              },
-            ),
-          ],
+          ),
         ),
       ),
     );

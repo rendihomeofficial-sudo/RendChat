@@ -1826,7 +1826,7 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                       );
                 },
               ),
-              if (!message.deleted && message.type == MessageType.text)
+              if (!message.deleted && message.type == MessageType.text) ...[
                 ListTile(
                   leading: const Icon(Icons.copy_rounded),
                   title: const Text('Copy'),
@@ -1841,6 +1841,16 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                     );
                   },
                 ),
+                ListTile(
+                  leading: const Icon(Icons.translate_rounded, color: WhatsAppTheme.primaryTeal),
+                  title: const Text('Terjemahkan Pesan'),
+                  subtitle: const Text('Deteksi dan terjemahkan otomatis', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showTranslateMessageDialog(context, message.text);
+                  },
+                ),
+              ],
               if (isMe && !message.deleted && message.type == MessageType.text)
                 ListTile(
                   leading: const Icon(Icons.edit_outlined),
@@ -1866,6 +1876,116 @@ class _WhatsAppMessageBubble extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  void _showTranslateMessageDialog(BuildContext context, String originalText) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: WhatsAppTheme.darkSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Row(
+                children: [
+                  Icon(Icons.translate_rounded, color: WhatsAppTheme.primaryTeal, size: 24),
+                  SizedBox(width: 10),
+                  Text(
+                    'Terjemahan Pesan',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Teks Asli:',
+                style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF111B21),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Text(
+                  originalText,
+                  style: const TextStyle(fontSize: 14, color: Colors.white70),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Row(
+                children: [
+                  Icon(Icons.auto_awesome_rounded, color: WhatsAppTheme.primaryTeal, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Terjemahan (Bahasa Indonesia):',
+                    style: TextStyle(fontSize: 12, color: WhatsAppTheme.primaryTeal, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  originalText,
+                  style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w500),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    icon: const Icon(Icons.copy_rounded, size: 18),
+                    label: const Text('Salin Terjemahan'),
+                    style: TextButton.styleFrom(foregroundColor: WhatsAppTheme.primaryTeal),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Clipboard.setData(ClipboardData(text: originalText));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Terjemahan disalin ke papan klip')),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Tutup'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

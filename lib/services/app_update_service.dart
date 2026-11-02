@@ -339,7 +339,9 @@ class UpdateBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final service = context.watch<AppUpdateService>();
     final info = service.updateInfo;
-    if (info == null) return const SizedBox.shrink();
+    // Sembunyikan banner saat modal dialog update / proses download sedang aktif
+    // agar tampilan progres download hanya ada satu (yaitu di tengah layar / dialog).
+    if (info == null || service.isDownloading) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
@@ -423,18 +425,6 @@ class UpdateBanner extends StatelessWidget {
               ),
             ],
           ),
-          if (service.isDownloading) ...[
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: service.downloadProgress > 0 ? service.downloadProgress : null,
-                backgroundColor: Colors.white12,
-                valueColor: const AlwaysStoppedAnimation<Color>(WhatsAppTheme.primaryTeal),
-                minHeight: 4,
-              ),
-            ),
-          ],
         ],
       ),
     );

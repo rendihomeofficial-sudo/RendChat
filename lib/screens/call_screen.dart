@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/call_model.dart';
 import '../services/auth_service.dart';
+import '../services/call_history_manager.dart';
 import '../services/chat_service.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/user_avatar.dart';
@@ -139,7 +140,9 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       final auth = context.read<AuthService>();
       final currentUser = auth.appUser;
       if (currentUser != null) {
-        final id = await chatService.initiateCall(
+        // Catat riwayat lokal langsung seketika (offline-first)
+        final localCall = CallModel(
+          id: widget.existingCallId ?? 'call_${DateTime.now().millisecondsSinceEpoch}',
           callerId: currentUser.uid,
           callerName: currentUser.displayName,
           callerAvatar: currentUser.photoURL,
@@ -147,20 +150,59 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
           receiverName: widget.callerName,
           receiverAvatar: widget.callerAvatar,
           isVideo: widget.isVideo,
+          status: 'calling',
+          createdAt: DateTime.now(),
         );
-        _activeCallId = id;
-        if (mounted) {
-          _listenCallStatus(id);
+        CallHistoryManager.instance.recordCall(localCall);
+
+        try {
+          final id = await chatService.initiateCall(
+            callerId: currentUser.uid,
+            callerName: currentUser.displayName,
+            callerAvatar: currentUser.photoURL,
+            receiverId: widget.receiverId!,
+            receiverName: widget.callerName,
+            receiverAvatar: widget.callerAvatar,
+            isVideo: widget.isVideo,
+          );
+          _activeCallId = id;
+          if (mounted) {
+            _listenCallStatus(id);
+          }
+        } catch (e) {
+          debugPrint('Error initiating Firestore call: $e');
         }
       }
     }
   }
 
   void _endCallInFirestore() {
+    final auth = context.read<AuthService>();
+    final currentUser = auth.appUser;
+    final finalStatus = _isConnected ? 'ended' : 'missed';
+
+    if (currentUser != null) {
+      CallHistoryManager.instance.recordCall(
+        CallModel(
+          id: _activeCallId ?? 'call_${DateTime.now().millisecondsSinceEpoch}',
+          callerId: currentUser.uid,
+          callerName: currentUser.displayName,
+          callerAvatar: currentUser.photoURL,
+          receiverId: widget.receiverId ?? '',
+          receiverName: widget.callerName,
+          receiverAvatar: widget.callerAvatar,
+          isVideo: widget.isVideo,
+          status: finalStatus,
+          createdAt: DateTime.now(),
+          durationSeconds: _callSeconds,
+        ),
+      );
+    }
+
     if (_activeCallId != null) {
       context.read<ChatService>().updateCallStatus(
             _activeCallId!,
-            _isConnected ? 'ended' : 'missed',
+            finalStatus,
             durationSeconds: _callSeconds,
           );
     }

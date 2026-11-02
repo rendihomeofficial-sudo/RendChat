@@ -14,6 +14,7 @@ import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../services/storage_service.dart';
 import '../services/ringtone_service.dart';
+import '../services/call_history_manager.dart';
 import '../services/lock_chat_passcode_manager.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/user_avatar.dart';
@@ -1340,97 +1341,108 @@ class _HomeScreenState extends State<HomeScreen> {
     return StreamBuilder<List<CallModel>>(
       stream: chatService.streamUserCalls(currentUser.uid),
       builder: (context, snapshot) {
-        final calls = snapshot.data ?? [];
+        if (snapshot.hasData && snapshot.data != null) {
+          CallHistoryManager.instance.syncRemoteCalls(snapshot.data!);
+        }
 
-        return ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          children: [
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: WhatsAppTheme.primaryTeal,
-                child: Icon(Icons.link_rounded, color: Colors.white),
+        return ValueListenableBuilder<List<CallModel>>(
+          valueListenable: CallHistoryManager.instance.callsNotifier,
+          builder: (context, calls, _) {
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
               ),
-              title: const Text('Create call link', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Share a link for your RenChat call',
-                  style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
-              onTap: () {
-                _showCallLinkDialog(context);
-              },
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Text(
-                'Recent',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 15, color: WhatsAppTheme.darkTextSecondary),
-              ),
-            ),
-            if (calls.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                child: Center(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: WhatsAppTheme.primaryTeal,
+                    child: Icon(Icons.link_rounded, color: Colors.white),
+                  ),
+                  title: const Text('Create call link', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Share a link for your RenChat call',
+                      style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+                  onTap: () {
+                    _showCallLinkDialog(context);
+                  },
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Text(
-                    'No call history yet. Start a voice or video call from any chat!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: WhatsAppTheme.darkTextSecondary),
+                    'Recent',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 15, color: WhatsAppTheme.darkTextSecondary),
                   ),
                 ),
-              )
-            else
-              ...calls.map((c) {
-                final isCaller = c.callerId == currentUser.uid;
-                final displayName = isCaller ? c.receiverName : c.callerName;
-                final displayAvatar = isCaller ? c.receiverAvatar : c.callerAvatar;
-                final isMissed = c.status == 'missed' || c.status == 'rejected';
+                if (calls.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                    child: Center(
+                      child: Text(
+                        'Belum ada riwayat panggilan. Mulai panggilan suara atau video dari chat Anda!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: WhatsAppTheme.darkTextSecondary),
+                      ),
+                    ),
+                  )
+                else
+                  ...calls.map((c) {
+                    final isCaller = c.callerId == currentUser.uid;
+                    final displayName = isCaller ? c.receiverName : c.callerName;
+                    final displayAvatar = isCaller ? c.receiverAvatar : c.callerAvatar;
+                    final isMissed = c.status == 'missed' || c.status == 'rejected';
 
-                return ListTile(
-                  leading: UserAvatar(
-                    name: displayName,
-                    photoUrl: displayAvatar,
-                    radius: 22,
-                  ),
-                  title: Text(
-                    displayName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isMissed && !isCaller ? Colors.redAccent : null,
-                    ),
-                  ),
-                  subtitle: Row(
-                    children: [
-                      Icon(
-                        isCaller ? Icons.call_made_rounded : Icons.call_received_rounded,
-                        size: 16,
-                        color: isMissed ? Colors.redAccent : Colors.green,
+                    return ListTile(
+                      leading: UserAvatar(
+                        name: displayName,
+                        photoUrl: displayAvatar,
+                        radius: 22,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${DateFormat('MMM d, h:mm a').format(c.createdAt)}${c.durationSeconds > 0 ? ' • ${c.durationSeconds}s' : ''}',
-                        style: const TextStyle(color: WhatsAppTheme.darkTextSecondary),
-                      ),
-                    ],
-                  ),
-                  trailing: IconButton(
-                    icon: Icon(
-                      c.isVideo ? Icons.videocam_outlined : Icons.call_outlined,
-                      color: WhatsAppTheme.primaryTeal,
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CallScreen(
-                            callerName: displayName,
-                            callerAvatar: displayAvatar,
-                            isVideo: c.isVideo,
-                          ),
+                      title: Text(
+                        displayName,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isMissed && !isCaller ? Colors.redAccent : null,
                         ),
-                      );
-                    },
-                  ),
-                );
-              }),
-          ],
+                      ),
+                      subtitle: Row(
+                        children: [
+                          Icon(
+                            isCaller ? Icons.call_made_rounded : Icons.call_received_rounded,
+                            size: 16,
+                            color: isMissed ? Colors.redAccent : Colors.green,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${DateFormat('MMM d, h:mm a').format(c.createdAt)}${c.durationSeconds > 0 ? ' • ${c.durationSeconds}s' : ''}',
+                            style: const TextStyle(color: WhatsAppTheme.darkTextSecondary),
+                          ),
+                        ],
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(
+                          c.isVideo ? Icons.videocam_outlined : Icons.call_outlined,
+                          color: WhatsAppTheme.primaryTeal,
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CallScreen(
+                                callerName: displayName,
+                                callerAvatar: displayAvatar,
+                                isVideo: c.isVideo,
+                                receiverId: isCaller ? c.receiverId : c.callerId,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  }),
+              ],
+            );
+          },
         );
       },
     );

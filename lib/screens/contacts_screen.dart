@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/user_avatar.dart';
+import 'camera_qr_scanner_screen.dart';
 import 'chat_screen.dart';
 
 class ContactsScreen extends StatefulWidget {
@@ -209,77 +210,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   void _showScanBarcodeDialog() {
-    final inputCtrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppTheme.darkSurface,
-        title: const Row(
-          children: [
-            Icon(Icons.qr_code_scanner_rounded, color: WhatsAppTheme.primaryTeal),
-            SizedBox(width: 8),
-            Text('Scan / Masukkan Kode Teman'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Tempel kode QR undangan atau ID teman untuk membuka obrolan langsung:',
-              style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: inputCtrl,
-              autofocus: true,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Tempel kode (RENCHAT:UID:... / Email)',
-                hintStyle: const TextStyle(color: Colors.white54, fontSize: 13),
-                filled: true,
-                fillColor: const Color(0xFF121B22),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
-            icon: const Icon(Icons.chat_bubble_rounded),
-            label: const Text('Mulai Chat'),
-            onPressed: () async {
-              final raw = inputCtrl.text.trim();
-              if (raw.isEmpty) return;
-              Navigator.pop(ctx);
-
-              String targetUid = raw;
-              if (raw.startsWith('RENCHAT:')) {
-                final parts = raw.split(':');
-                if (parts.length >= 2) targetUid = parts[1];
-              }
-
-              // Cari pengguna di Firestore
-              final auth = context.read<AuthService>();
-              final chatService = context.read<ChatService>();
-              final currentUser = auth.appUser;
-              if (currentUser == null) return;
-
-              final contacts = await chatService.searchUsers(targetUid, currentUser.uid);
-              if (contacts.isNotEmpty) {
-                _startChatWith(contacts.first);
-              } else {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Pengguna tidak ditemukan.')),
-                  );
-                }
-              }
-            },
-          ),
-        ],
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CameraQrScannerScreen(),
       ),
     );
   }
