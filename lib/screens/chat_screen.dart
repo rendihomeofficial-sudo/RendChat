@@ -840,7 +840,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   try {
                     await context.read<ChatService>().clearChat(
                           widget.chat.id,
-                          userId: currentUser.uid,
+                          userId: currentUid,
                         );
                     if (mounted) {
                       showPremiumNotificationToast(
