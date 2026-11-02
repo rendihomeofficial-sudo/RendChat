@@ -1,8 +1,8 @@
 {
-  "version": "1.3.13",
-  "version_code": 26,
-  "title": "RenChat v1.3.13 - Fitur Bersihkan Obrolan Model WhatsApp & Rules Cloud Firestore Terbaru",
-  "release_notes": "• Pembersihan Obrolan Model WhatsApp: Fitur 'Bersihkan Obrolan' kini mencatat timestamp pembersihan per pengguna (clearedAt). Pesan terhapus bersih dari perangkat Anda tanpa menghilangkan riwayat obrolan milik lawan bicara.\n• Pembaruan Rules Cloud Firestore: Aturan otorisasi delete pesan dan pembaruan metadata clearedAt telah disinkronkan langsung ke server produksi tanpa kendala permission-denied.\n• Sinkronisasi Galeri Media & Tautan: Tab Media, Dokumen, dan Tautan pada percakapan menyaring pesan secara akurat berdasarkan waktu pembersihan obrolan terkini.\n• Penyempurnaan Kamera Video Call PIP: Kamera depan fisik CameraController menyala mulus langsung pada jendela preview PIP saat panggilan video.",
+  "version": "1.3.14",
+  "version_code": 27,
+  "title": "RenChat v1.3.14 - Fitur Bisukan Notifikasi, Pesan Sementara, & Sinkronisasi Subtitle",
+  "release_notes": "• Bisukan Notifikasi Nyata (Mute): Opsi menu dan pengaturan kontak kini menyimpan status durasi bisu (8 Jam, 1 Minggu, atau Selalu) langsung ke Cloud Firestore.\n• Pesan Sementara Interaktif (Disappearing Messages): Pilihan durasi hapus otomatis (24 Jam, 7 Hari, 90 Hari, atau Mati) tersimpan dan tersinkronisasi di obrolan.\n• Sinkronisasi Subtitle Bersihkan Obrolan: Tampilan cuplikan pesan di daftar Chat Terkunci (Locked Chats) dan Arsip (Archived Chats) otomatis menyesuaikan status pembersihan per-user.\n• Rules Keamanan Cloud Firestore Terbaru: Izin pembaruan metadata mutedUntil dan disappearingDuration aktif di server produksi.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
