@@ -13,6 +13,7 @@ import '../services/app_update_service.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../services/storage_service.dart';
+import '../services/ringtone_service.dart';
 import '../services/lock_chat_passcode_manager.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/user_avatar.dart';
@@ -259,6 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _incomingCallSub = chatService.streamIncomingCall(uid).listen((incoming) {
       if (incoming != null && incoming.id != _showingCallId && mounted) {
         _showingCallId = incoming.id;
+        RingtoneService.instance.startIncomingRingtone();
         _showIncomingCallDialog(incoming);
       }
     });
@@ -270,46 +272,74 @@ class _HomeScreenState extends State<HomeScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1F2C34),
-        title: Text(
-          call.isVideo ? 'Incoming Video Call' : 'Incoming Voice Call',
-          style: const TextStyle(color: WhatsAppTheme.primaryTeal, fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            Icon(
+              call.isVideo ? Icons.videocam_rounded : Icons.phone_in_talk_rounded,
+              color: WhatsAppTheme.primaryTeal,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              call.isVideo ? 'Panggilan Video Masuk' : 'Panggilan Suara Masuk',
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            UserAvatar(
-              name: call.callerName,
-              photoUrl: call.callerAvatar,
-              radius: 36,
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: WhatsAppTheme.primaryTeal, width: 2.5),
+              ),
+              child: UserAvatar(
+                name: call.callerName,
+                photoUrl: call.callerAvatar,
+                radius: 40,
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Text(
               call.callerName,
               style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             const Text(
-              'RenChat Call...',
-              style: TextStyle(color: WhatsAppTheme.darkTextSecondary),
+              'Memanggil Anda di RenChat...',
+              style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13),
             ),
           ],
         ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         actions: [
           TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.redAccent,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
             icon: const Icon(Icons.call_end_rounded),
-            label: const Text('Decline'),
+            label: const Text('Tolak'),
             onPressed: () {
+              RingtoneService.instance.stopRingtone();
               Navigator.pop(ctx);
               context.read<ChatService>().updateCallStatus(call.id, 'rejected');
               _showingCallId = null;
             },
           ),
           FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+            style: FilledButton.styleFrom(
+              backgroundColor: WhatsAppTheme.primaryTeal,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
             icon: Icon(call.isVideo ? Icons.videocam_rounded : Icons.call_rounded),
-            label: const Text('Accept'),
+            label: const Text('Terima', style: TextStyle(fontWeight: FontWeight.bold)),
             onPressed: () {
+              RingtoneService.instance.stopRingtone();
               Navigator.pop(ctx);
               _showingCallId = null;
               context.read<ChatService>().updateCallStatus(call.id, 'connected');
@@ -328,7 +358,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      RingtoneService.instance.stopRingtone();
+    });
   }
 
   @override
@@ -815,6 +847,10 @@ class _HomeScreenState extends State<HomeScreen> {
               }
 
               return ListView.separated(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                cacheExtent: 500,
                 itemCount: chats.length,
                 separatorBuilder: (_, __) => const Divider(
                   height: 1,

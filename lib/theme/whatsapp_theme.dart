@@ -102,6 +102,12 @@ class WhatsAppTheme {
         color: Color(0xFF202C33),
         thickness: 0.6,
       ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
     );
   }
 
@@ -155,6 +161,12 @@ class WhatsAppTheme {
       dividerTheme: const DividerThemeData(
         color: Color(0xFFE9EDEF),
         thickness: 0.6,
+      ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
       ),
     );
   }

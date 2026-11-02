@@ -1260,6 +1260,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       ListView.builder(
                         reverse: true,
                         controller: _scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        cacheExtent: 600,
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         itemCount: messages.length + 1, // +1 for E2EE Banner
                         itemBuilder: (context, index) {

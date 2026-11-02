@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
 import 'services/app_update_service.dart';
 import 'services/auth_service.dart';
 import 'services/chat_service.dart';
@@ -77,17 +78,26 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   String? _initializedUid;
+  bool _showSplash = true;
+
+  void _onSplashFinish() {
+    if (mounted) {
+      setState(() {
+        _showSplash = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_showSplash) {
+      return ModernSplashScreen(onFinish: _onSplashFinish);
+    }
+
     final auth = context.watch<AuthService>();
 
     if (auth.isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return ModernSplashScreen(onFinish: () {});
     }
 
     if (!auth.isAuthenticated) {

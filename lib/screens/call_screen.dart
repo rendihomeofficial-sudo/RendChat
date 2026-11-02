@@ -458,54 +458,94 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     return Container(
       width: double.infinity,
       height: double.infinity,
-      decoration: const BoxDecoration(
-        color: Color(0xFF131D24),
-      ),
+      color: const Color(0xFF0B141B),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Remote simulated camera feed
-          Container(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment.center,
-                radius: 1.2,
-                colors: [
-                  const Color(0xFF223642),
-                  const Color(0xFF0F1A20),
-                ],
-              ),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  UserAvatar(
-                    name: widget.callerName,
-                    photoUrl: widget.callerAvatar,
-                    radius: 54,
+          // Remote simulated camera feed with smooth animated ambient waves
+          AnimatedBuilder(
+            animation: _pulseAnimation,
+            builder: (context, _) {
+              return Container(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.center,
+                    radius: 1.1 + (_pulseAnimation.value * 0.15),
+                    colors: [
+                      const Color(0xFF1E332E),
+                      const Color(0xFF0F1E24),
+                      const Color(0xFF070E12),
+                    ],
+                    stops: const [0.0, 0.6, 1.0],
                   ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                ),
+              );
+            },
+          ),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ScaleTransition(
+                  scale: _isConnected ? const AlwaysStoppedAnimation(1.0) : _pulseAnimation,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: Colors.black45,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.videocam_rounded, color: WhatsAppTheme.primaryTeal, size: 16),
-                        SizedBox(width: 8),
-                        Text(
-                          'Remote Camera Stream Active (HD)',
-                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _isConnected ? WhatsAppTheme.primaryTeal : Colors.white24,
+                        width: 3.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: WhatsAppTheme.primaryTeal.withValues(alpha: _isConnected ? 0.35 : 0.15),
+                          blurRadius: 32,
+                          spreadRadius: 4,
                         ),
                       ],
                     ),
+                    child: UserAvatar(
+                      name: widget.callerName,
+                      photoUrl: widget.callerAvatar,
+                      radius: 64,
+                    ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _isConnected ? WhatsAppTheme.primaryTeal.withValues(alpha: 0.6) : Colors.white12,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: _isConnected ? const Color(0xFF25D366) : Colors.orangeAccent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _isConnected ? 'Live Video Streaming HD (60 FPS)' : 'Menghubungkan Video Live...',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],

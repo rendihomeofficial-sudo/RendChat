@@ -1,8 +1,8 @@
 {
-  "version": "1.3.4",
-  "version_code": 17,
-  "title": "RenChat v1.3.4 - Perbaikan Tampilan Status & Kompresi Unggah Media",
-  "release_notes": "• Perbaikan Tampilan Status Foto: Gambar status yang beresolusi tinggi kini tampil jernih seketika dan tidak lagi blank/hitam saat durasi status berputar.\n• Kompresi Otomatis Status Media: Pengunggahan foto status kini dioptimasi secara otomatis sehingga tidak lagi mengalami kegagalan server sibuk akibat ukuran dokumen berlebih.\n• Optimasi Lampiran Chat & Profil: Penskalaan otomatis foto saat pengiriman chat dan penggantian avatar profil agar proses pengiriman selalu cepat dan lancar.",
+  "version": "1.3.5",
+  "version_code": 18,
+  "title": "RenChat v1.3.5 - UI Super Smooth, Modern Splash Screen & Audio Ringtone Panggilan",
+  "release_notes": "• UI Super Smooth 60 FPS: Mengintegrasikan BouncingScrollPhysics dan cacheExtent untuk rendering list chat dan pesan tanpa patah-patah/lag.\n• Transisi Layar Halus: Menggunakan CupertinoPageTransitionsBuilder di seluruh sistem navigasi untuk animasi perpindahan halaman yang konsisten dan mulus.\n• Modern Animated Splash Screen: Tampilan pembuka baru bergaya elegan dengan ambient radial glow, animasi skala lembut, dan branding eksklusif RenChat.\n• Audio Ringtone Panggilan Masuk: Panggilan video & suara kini berdering nyaring dengan looping audio telekomunikasi yang jernih serta sinkronisasi getaran haptik real-time.\n• Live Video Call HD Smooth: Tampilan canvas video call live yang jernih, mulus tanpa distorsi seperti kaset rusak.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
