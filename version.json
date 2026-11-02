@@ -1,8 +1,8 @@
 {
-  "version": "1.3.9",
-  "version_code": 22,
-  "title": "RenChat v1.3.9 - Live Video Call Audio Nyata, Swap Panggilan Suara <-> Video, & Layar PIP Draggable",
-  "release_notes": "• Input Audio Mikrofon Realtime: Mikrofon aktif secara nyata pada panggilan suara dan video tanpa lag atau keterlambatan.\n• Swap Dinamis Panggilan: Tombol Video di docking bawah memungkinkan perpindahan seketika antara panggilan suara dan video call secara live.\n• Layar Kamera Kecil (PIP) Draggable: Jendela kamera diri sendiri dapat digeser bebas dan dipindahkan ke sudut mana saja di layar.\n• Antarmuka Call Screen Premium WhatsApp: Tampilan layar panggilan full Bahasa Indonesia dengan kontrol halus, indikator audio aktif, dan enkripsi end-to-end.\n• Penyesuaian Nada Dering Pintar: Nada sambung berdering hanya saat penerima online dan hening saat penerima offline.",
+  "version": "1.3.10",
+  "version_code": 23,
+  "title": "RenChat v1.3.10 - Live VC Camera Instan, Swap Video Call, Timer Durasi Panggilan, & Barcode QR Modern",
+  "release_notes": "• Live Video Camera Instan: Kamera dan avatar langsung aktif seketika saat menekan VC atau swap dari panggilan suara ke video call.\n• Floating Self-View PIP Interaktif: Jendela kamera diri sendiri dapat digeser (draggable) ke sudut mana saja dengan indikator live camera & live mic.\n• Realtime Call Duration Timer: Timer durasi panggilan berjalan detik demi detik secara nyata menggantikan status memanggil saat tersambung.\n• Barcode QR Akun Modern & Profesional: Berbagi kontak kini menggunakan Barcode QR elegan dan Salin ID instan, tanpa tautan teks panjang.\n• Scanner Barcode Kamera Nyata: Fitur pemindai dilengkapi tombol Buka Kamera perangkat langsung, Galeri foto, dan pencarian cepat berbasis ID akun.\n• Dialog Pembaruan Aplikasi Akurat: Tombol Periksa Update memberikan dialog status jelas jika aplikasi sudah up-to-date atau siap pasang.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
