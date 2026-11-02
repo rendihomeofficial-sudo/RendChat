@@ -725,6 +725,18 @@ class ChatService {
     await _firestore.collection('calls').doc(callId).update(updates);
   }
 
+  // Beralih secara dinamis antara panggilan suara dan panggilan video (Live Swap)
+  Future<void> toggleCallVideoMode(String callId, bool isVideo) async {
+    try {
+      await _firestore.collection('calls').doc(callId).update({
+        'isVideo': isVideo,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error toggling call video mode: $e');
+    }
+  }
+
   Stream<List<CallModel>> streamUserCalls(String userId) {
     return _firestore
         .collection('calls')

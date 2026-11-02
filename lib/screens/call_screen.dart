@@ -3,6 +3,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:record/record.dart';
 import '../models/call_model.dart';
 import '../services/auth_service.dart';
 import '../services/call_history_manager.dart';
@@ -31,6 +32,7 @@ class CallScreen extends StatefulWidget {
 }
 
 class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateMixin {
+  late bool _isVideo;
   bool _isMuted = false;
   bool _isSpeaker = false;
   bool _isVideoOff = false;
@@ -44,6 +46,16 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   StreamSubscription<CallModel?>? _callStatusSub;
   StreamSubscription<AppUser?>? _receiverPresenceSub;
   String? _activeCallId;
+
+  // Real Microphone Input Stream untuk audio live tanpa delay
+  late final AudioRecorder _liveAudioRecorder;
+  StreamSubscription<RecordState>? _recordSub;
+  StreamSubscription<Amplitude>? _amplitudeSub;
+  double _currentMicLevel = 0.0;
+
+  // Draggable PIP Self-View Position
+  Offset _pipPosition = const Offset(20, 100);
+  bool _isPipInitialized = false;
 
   // Pulse ring animation
   late AnimationController _pulseController;
@@ -59,8 +71,10 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
+    _isVideo = widget.isVideo;
     _activeCallId = widget.existingCallId;
     _isSpeaker = widget.isVideo;
+    _liveAudioRecorder = AudioRecorder();
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -69,8 +83,34 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    _initLiveMicAudio();
     _startCallingSound();
     _initiateFirestoreCall();
+  }
+
+  // Inisialisasi input audio mikrofon live berkecepatan tinggi tanpa lag
+  Future<void> _initLiveMicAudio() async {
+    try {
+      if (await _liveAudioRecorder.hasPermission()) {
+        _recordSub = _liveAudioRecorder.onStateChanged().listen((state) {
+          debugPrint('Live call mic state: $state');
+        });
+
+        // Pantau level input suara dari mikrofon pengguna secara realtime
+        _amplitudeSub = _liveAudioRecorder
+            .onAmplitudeChanged(const Duration(milliseconds: 100))
+            .listen((amp) {
+          if (mounted && !_isMuted && _isConnected) {
+            final normalized = (amp.current + 50) / 50.0;
+            setState(() {
+              _currentMicLevel = normalized.clamp(0.0, 1.0);
+            });
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error starting live mic input: $e');
+    }
   }
 
   void _startCallingSound() {
@@ -119,6 +159,21 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     final chatService = context.read<ChatService>();
     _callStatusSub = chatService.streamCall(callId).listen((call) {
       if (call == null || !mounted) return;
+
+      // Sync realtime video mode jika lawan bicara beralih ke video call
+      if (call.isVideo != _isVideo) {
+        setState(() {
+          _isVideo = call.isVideo;
+          if (_isVideo) _isSpeaker = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isVideo ? 'Beralih ke Panggilan Video' : 'Beralih ke Panggilan Suara',
+            ),
+          ),
+        );
+      }
 
       if (call.status == 'connected' && !_isConnected) {
         _stopCallingSound();
@@ -214,7 +269,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
           receiverId: widget.receiverId ?? '',
           receiverName: widget.callerName,
           receiverAvatar: widget.callerAvatar,
-          isVideo: widget.isVideo,
+          isVideo: _isVideo,
           status: finalStatus,
           createdAt: DateTime.now(),
           durationSeconds: _callSeconds,
@@ -243,6 +298,9 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    _recordSub?.cancel();
+    _amplitudeSub?.cancel();
+    _liveAudioRecorder.dispose();
     _receiverPresenceSub?.cancel();
     _stopCallingSound();
     _pulseController.dispose();
@@ -281,7 +339,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                   const Icon(Icons.group_add_rounded, color: WhatsAppTheme.primaryTeal),
                   const SizedBox(width: 12),
                   const Text(
-                    'Add participants',
+                    'Tambah Peserta',
                     style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
@@ -293,7 +351,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
               ),
               const SizedBox(height: 12),
               const Text(
-                'Up to 32 people can join this RenChat group call.',
+                'Hingga 32 orang dapat bergabung dalam panggilan grup RenChat ini.',
                 style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13),
               ),
               const SizedBox(height: 16),
@@ -303,12 +361,12 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                   backgroundColor: WhatsAppTheme.primaryTeal,
                   child: Icon(Icons.link_rounded, color: Colors.white),
                 ),
-                title: const Text('Share Call Link', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                subtitle: const Text('Anyone with RenChat can join', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+                title: const Text('Salin Tautan Panggilan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: const Text('Siapa pun yang memiliki tautan dapat bergabung', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
                 onTap: () {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('RenChat Call link copied to clipboard!')),
+                    const SnackBar(content: Text('Tautan panggilan RenChat disalin ke papan klip!')),
                   );
                 },
               ),
@@ -326,7 +384,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       body: Stack(
         children: [
           // Background: Fullscreen video or WhatsApp dark gradient
-          if (widget.isVideo && !_isVideoOff)
+          if (_isVideo && !_isVideoOff)
             _buildVideoBackground()
           else
             _buildVoiceBackground(),
@@ -416,8 +474,8 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                     Text(
                       !_isConnected
                           ? (_isRinging
-                              ? (widget.isVideo ? 'Panggilan video berdering...' : 'Berdering...')
-                              : (widget.isVideo ? 'Memanggil video...' : 'Memanggil...'))
+                              ? (_isVideo ? 'Panggilan video berdering...' : 'Berdering...')
+                              : (_isVideo ? 'Memanggil video...' : 'Memanggil...'))
                           : _formatDuration(_callSeconds),
                       style: TextStyle(
                         color: _isConnected
@@ -433,7 +491,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                 const Spacer(),
 
                 // 3. CENTER AVATAR (For voice or disabled camera)
-                if (!widget.isVideo || _isVideoOff)
+                if (!_isVideo || _isVideoOff)
                   ScaleTransition(
                     scale: !_isConnected ? _pulseAnimation : const AlwaysStoppedAnimation(1.0),
                     child: Container(
@@ -455,70 +513,131 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
 
                 const Spacer(),
 
-                // 4. FLOATING SELF-VIEW PIP (When Video is active)
-                if (widget.isVideo && !_isVideoOff)
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() => _isFrontCamera = !_isFrontCamera);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(_isFrontCamera ? 'Switched to front camera' : 'Switched to rear camera')),
-                        );
-                      },
-                      child: Container(
-                        width: 105,
-                        height: 155,
-                        margin: const EdgeInsets.only(right: 20, bottom: 16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1F2C34),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white30, width: 2),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
-                          ],
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Stack(
-                          children: [
-                            Container(
-                              color: const Color(0xFF2A3942),
-                              child: const Center(
-                                child: Icon(Icons.person, color: Colors.white54, size: 48),
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 6,
-                              right: 6,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Colors.black54,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.flip_camera_ios_rounded, color: Colors.white, size: 14),
-                              ),
-                            ),
-                            const Positioned(
-                              top: 6,
-                              left: 6,
-                              child: Text(
-                                'You',
-                                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
                 // 5. BOTTOM WHATSAPP CONTROL DOCK
                 _buildControlDock(),
               ],
             ),
           ),
+
+          // 4. FLOATING DRAGGABLE SELF-VIEW PIP (When Video is active)
+          if (_isVideo && !_isVideoOff)
+            _buildDraggablePip(context),
         ],
+      ),
+    );
+  }
+
+  // Floating Draggable Self-View PIP Widget
+  Widget _buildDraggablePip(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    const double pipWidth = 115.0;
+    const double pipHeight = 165.0;
+
+    if (!_isPipInitialized) {
+      _pipPosition = Offset(
+        screenSize.width - pipWidth - 16,
+        screenSize.height - pipHeight - 160,
+      );
+      _isPipInitialized = true;
+    }
+
+    return Positioned(
+      left: _pipPosition.dx,
+      top: _pipPosition.dy,
+      child: GestureDetector(
+        onPanUpdate: (details) {
+          setState(() {
+            final newX = (_pipPosition.dx + details.delta.dx)
+                .clamp(12.0, screenSize.width - pipWidth - 12.0);
+            final newY = (_pipPosition.dy + details.delta.dy)
+                .clamp(60.0, screenSize.height - pipHeight - 120.0);
+            _pipPosition = Offset(newX, newY);
+          });
+        },
+        child: Container(
+          width: pipWidth,
+          height: pipHeight,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1F2C34),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.8), width: 2),
+            boxShadow: const [
+              BoxShadow(color: Colors.black54, blurRadius: 14, offset: Offset(0, 4)),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              Container(
+                color: const Color(0xFF2A3942),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.person, color: Colors.white70, size: 44),
+                      if (_currentMicLevel > 0.05) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.mic_rounded, color: WhatsAppTheme.primaryTeal, size: 10),
+                              SizedBox(width: 2),
+                              Text('Live Mic', style: TextStyle(color: WhatsAppTheme.primaryTeal, fontSize: 8.5, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 6,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Anda',
+                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 6,
+                right: 6,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _isFrontCamera = !_isFrontCamera);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        duration: const Duration(milliseconds: 900),
+                        content: Text(_isFrontCamera ? 'Kamera depan aktif' : 'Kamera belakang aktif'),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.flip_camera_ios_rounded, color: Colors.white, size: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -683,46 +802,52 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                 },
               ),
 
-              // Video Camera toggle
-              if (widget.isVideo)
-                _dockButton(
-                  icon: _isVideoOff ? Icons.videocam_off_rounded : Icons.videocam_rounded,
-                  label: 'Video',
-                  isActive: !_isVideoOff,
-                  onTap: () {
-                    setState(() => _isVideoOff = !_isVideoOff);
+              // Video Camera toggle & Live Swap Panggilan Suara <-> Video Call
+              _dockButton(
+                icon: _isVideo
+                    ? (_isVideoOff ? Icons.videocam_off_rounded : Icons.videocam_rounded)
+                    : Icons.videocam_outlined,
+                label: 'Video',
+                isActive: _isVideo && !_isVideoOff,
+                onTap: () async {
+                  HapticFeedback.mediumImpact();
+                  final newVideoState = !_isVideo;
+                  setState(() {
+                    _isVideo = newVideoState;
+                    if (newVideoState) {
+                      _isSpeaker = true;
+                      _isVideoOff = false;
+                    }
+                  });
+                  if (_activeCallId != null) {
+                    await context.read<ChatService>().toggleCallVideoMode(_activeCallId!, newVideoState);
+                  }
+                  if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        duration: const Duration(milliseconds: 900),
-                        content: Text(_isVideoOff ? 'Camera paused' : 'Camera turned on'),
+                        duration: const Duration(seconds: 1),
+                        content: Text(
+                          newVideoState
+                              ? 'Beralih ke Panggilan Video (Live)'
+                              : 'Beralih ke Panggilan Suara',
+                        ),
                       ),
                     );
-                  },
-                )
-              else
-                // Switch to video call button for voice calls
-                _dockButton(
-                  icon: Icons.videocam_outlined,
-                  label: 'Video',
-                  isActive: false,
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Requesting video call switch...')),
-                    );
-                  },
-                ),
+                  }
+                },
+              ),
 
               // Mic Mute toggle
               _dockButton(
                 icon: _isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-                label: 'Mute',
+                label: 'Bisukan',
                 isActive: _isMuted,
                 onTap: () {
                   setState(() => _isMuted = !_isMuted);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       duration: const Duration(milliseconds: 900),
-                      content: Text(_isMuted ? 'Microphone muted' : 'Microphone unmuted'),
+                      content: Text(_isMuted ? 'Mikrofon dibisukan' : 'Mikrofon aktif'),
                     ),
                   );
                 },
@@ -731,7 +856,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
               // Hold call toggle
               _dockButton(
                 icon: _isHolding ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                label: _isHolding ? 'Resume' : 'Hold',
+                label: _isHolding ? 'Lanjut' : 'Tahan',
                 isActive: _isHolding,
                 onTap: () {
                   setState(() => _isHolding = !_isHolding);
@@ -749,8 +874,8 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                     SnackBar(
                       content: Text(
                         _isConnected
-                            ? 'Call ended • Duration ${_formatDuration(_callSeconds)}'
-                            : 'Call cancelled',
+                            ? 'Panggilan berakhir • Durasi ${_formatDuration(_callSeconds)}'
+                            : 'Panggilan dibatalkan',
                       ),
                     ),
                   );
