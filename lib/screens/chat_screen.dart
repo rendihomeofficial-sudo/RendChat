@@ -36,7 +36,7 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   final _picker = ImagePicker();
@@ -80,6 +80,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _audioRecorder = AudioRecorder();
     final auth = context.read<AuthService>();
     final chatService = context.read<ChatService>();
@@ -117,7 +118,36 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      _clearTypingStatus();
+    }
+  }
+
+  void _clearTypingStatus() {
+    _typingDebounce?.cancel();
+    if (_isTyping) {
+      _isTyping = false;
+      try {
+        final auth = context.read<AuthService>();
+        final myUid = auth.currentUid;
+        final myName = auth.appUser?.displayName ?? 'Seseorang';
+        if (myUid != null) {
+          context.read<ChatService>().setTypingStatus(
+            chatId: widget.chat.id,
+            userId: myUid,
+            userName: myName,
+            isTyping: false,
+          );
+        }
+      } catch (_) {}
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _clearTypingStatus();
     _recordTimer?.cancel();
     _audioRecorder.dispose();
     _typingDebounce?.cancel();
@@ -283,6 +313,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final reply = _replyingToMessage;
     _textController.clear();
+    _clearTypingStatus();
     _onTextChanged('');
     setState(() {
       _replyingToMessage = null;
@@ -629,6 +660,101 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _showChatWallpaperPicker(BuildContext context) {
+    final settings = context.read<SettingsService>();
+    final options = [
+      'Default Doodle',
+      'Solid Emerald',
+      'Deep Navy',
+      'Charcoal Grey',
+      'Sunset Violet'
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: WhatsAppTheme.darkSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (bCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Wallpaper Obrolan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(bCtx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: WhatsAppTheme.primaryTeal),
+                ),
+                title: const Text('Pilih Foto dari Galeri Pribadi', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Gunakan foto favorit Anda sebagai wallpaper obrolan', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+                onTap: () async {
+                  Navigator.pop(bCtx);
+                  try {
+                    final picked = await _picker.pickImage(
+                      source: ImageSource.gallery,
+                      maxWidth: 1920,
+                      maxHeight: 1920,
+                      imageQuality: 90,
+                    );
+                    if (picked != null) {
+                      await settings.setCustomWallpaperPath(picked.path);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Wallpaper foto pribadi berhasil diterapkan!')),
+                        );
+                      }
+                    }
+                  } catch (e) {
+                    debugPrint('Error picking wallpaper image: $e');
+                  }
+                },
+              ),
+              const Divider(height: 16),
+              const Text('Warna Baku Solid', style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: options.map((opt) {
+                  final isSelected = settings.chatWallpaper == opt;
+                  return ChoiceChip(
+                    label: Text(opt),
+                    selected: isSelected,
+                    selectedColor: WhatsAppTheme.primaryTeal.withValues(alpha: 0.3),
+                    onSelected: (_) async {
+                      await settings.setCustomWallpaperPath(null);
+                      await settings.setChatWallpaper(opt);
+                      if (mounted) Navigator.pop(bCtx);
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _handleMenuAction(BuildContext context, String action, String title, String? otherUid, [bool isBlocked = false]) {
     final auth = context.read<AuthService>();
     final chatService = context.read<ChatService>();
@@ -678,9 +804,7 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         break;
       case 'wallpaper':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Wallpaper theme settings')),
-        );
+        _showChatWallpaperPicker(context);
         break;
       case 'clear':
         showDialog(
@@ -1204,18 +1328,18 @@ class _ChatScreenState extends State<ChatScreen> {
                       icon: const Icon(Icons.more_vert_rounded),
                       onSelected: (val) => _handleMenuAction(context, val, title, otherUid, isBlocked),
                       itemBuilder: (context) => [
-                        const PopupMenuItem(value: 'contact_info', child: Text('View contact')),
-                        const PopupMenuItem(value: 'media', child: Text('Media, links, and docs')),
-                        const PopupMenuItem(value: 'search', child: Text('Search')),
-                        const PopupMenuItem(value: 'mute', child: Text('Mute notifications')),
-                        const PopupMenuItem(value: 'disappearing', child: Text('Disappearing messages')),
-                        const PopupMenuItem(value: 'wallpaper', child: Text('Wallpaper')),
-                        const PopupMenuItem(value: 'clear', child: Text('Clear chat')),
+                        const PopupMenuItem(value: 'contact_info', child: Text('Lihat kontak')),
+                        const PopupMenuItem(value: 'media', child: Text('Media, tautan, & dokumen')),
+                        const PopupMenuItem(value: 'search', child: Text('Cari pesan')),
+                        const PopupMenuItem(value: 'mute', child: Text('Bisukan notifikasi')),
+                        const PopupMenuItem(value: 'disappearing', child: Text('Pesan sementara')),
+                        const PopupMenuItem(value: 'wallpaper', child: Text('Wallpaper obrolan')),
+                        const PopupMenuItem(value: 'clear', child: Text('Bersihkan obrolan')),
                         if (!widget.chat.isGroup && otherUid != null)
                           PopupMenuItem(
                             value: isBlocked ? 'unblock' : 'block',
                             child: Text(
-                              isBlocked ? 'Unblock' : 'Block',
+                              isBlocked ? 'Buka blokir' : 'Blokir kontak',
                               style: TextStyle(color: isBlocked ? WhatsAppTheme.primaryTeal : Colors.redAccent),
                             ),
                           ),
@@ -1225,9 +1349,29 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ],
       ),
-      body: Container(
-        color: context.watch<SettingsService>().wallpaperColor,
-        child: Column(
+      body: Builder(
+        builder: (context) {
+          final settings = context.watch<SettingsService>();
+          final customWallpaperPath = settings.customWallpaperPath;
+          final hasCustomPhoto = customWallpaperPath != null &&
+              File(customWallpaperPath).existsSync() &&
+              settings.chatWallpaper == 'Custom Photo';
+
+          return Container(
+            decoration: BoxDecoration(
+              color: settings.wallpaperColor,
+              image: hasCustomPhoto
+                  ? DecorationImage(
+                      image: FileImage(File(customWallpaperPath)),
+                      fit: BoxFit.cover,
+                      colorFilter: ColorFilter.mode(
+                        Colors.black.withValues(alpha: 0.35),
+                        BlendMode.darken,
+                      ),
+                    )
+                  : null,
+            ),
+            child: Column(
           children: [
             // Typing indicator bubble (animated)
             StreamBuilder<List<String>>(
@@ -1236,7 +1380,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 final typers = snap.data ?? [];
                 if (typers.isEmpty) return const SizedBox.shrink();
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   color: WhatsAppTheme.darkChatBg,
                   width: double.infinity,
                   child: Row(
@@ -1245,7 +1389,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          '${typers.join(', ')} typing...',
+                          '${typers.join(', ')} sedang mengetik...',
                           style: const TextStyle(
                             fontSize: 12,
                             fontStyle: FontStyle.italic,

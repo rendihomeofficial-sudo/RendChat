@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/chat_model.dart';
 import '../models/user_model.dart';
 import '../models/status_model.dart';
@@ -47,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription<CallModel?>? _incomingCallSub;
   String? _showingCallId;
 
-  final List<String> _filters = ['All', 'Unread', 'Favorites', 'Groups'];
+  final List<String> _filters = ['Semua', 'Belum Dibaca', 'Favorit', 'Grup'];
 
   @override
   void initState() {
@@ -390,22 +391,22 @@ class _HomeScreenState extends State<HomeScreen> {
             NavigationDestination(
               icon: Icon(Icons.chat_bubble_outline_rounded, color: WhatsAppTheme.darkTextSecondary),
               selectedIcon: Icon(Icons.chat_bubble_rounded, color: WhatsAppTheme.primaryTeal),
-              label: 'Chats',
+              label: 'Obrolan',
             ),
             NavigationDestination(
               icon: Icon(Icons.update_rounded, color: WhatsAppTheme.darkTextSecondary),
               selectedIcon: Icon(Icons.update_rounded, color: WhatsAppTheme.primaryTeal),
-              label: 'Updates',
+              label: 'Pembaruan',
             ),
             NavigationDestination(
               icon: Icon(Icons.groups_outlined, color: WhatsAppTheme.darkTextSecondary),
               selectedIcon: Icon(Icons.groups_rounded, color: WhatsAppTheme.primaryTeal),
-              label: 'Communities',
+              label: 'Komunitas',
             ),
             NavigationDestination(
               icon: Icon(Icons.call_outlined, color: WhatsAppTheme.darkTextSecondary),
               selectedIcon: Icon(Icons.call_rounded, color: WhatsAppTheme.primaryTeal),
-              label: 'Calls',
+              label: 'Panggilan',
             ),
           ],
         ),
@@ -453,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    final titles = ['RenChat', 'Updates', 'Communities', 'Calls'];
+    final titles = ['RenChat', 'Pembaruan', 'Komunitas', 'Panggilan'];
     return AppBar(
       title: Text(
         titles[_currentTabIndex],
@@ -1146,53 +1147,168 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }),
             const Divider(height: 24),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Channels',
+                  const Text(
+                    'Saluran Resmi',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  Text(
-                    'Explore >',
-                    style: TextStyle(color: WhatsAppTheme.primaryTeal, fontWeight: FontWeight.bold),
+                  InkWell(
+                    onTap: () async {
+                      final url = Uri.parse('https://github.com/rendihomeofficial-sudo/RendChat/releases');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Text(
+                        'Rilis GitHub >',
+                        style: TextStyle(color: WhatsAppTheme.primaryTeal, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Color(0xFF008069),
-                child: Icon(Icons.campaign_rounded, color: Colors.white),
+            // RenChat Official Channel Card with Live Release Info
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1B272C),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.25)),
               ),
-              title: const Text('RenChat Official', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Welcome to RenChat Channels! Get updates on new features.'),
-              trailing: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _isFollowingOfficialChannel ? Colors.white : WhatsAppTheme.primaryTeal,
-                  backgroundColor: _isFollowingOfficialChannel ? WhatsAppTheme.primaryTeal : null,
-                  side: const BorderSide(color: WhatsAppTheme.primaryTeal),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                ),
-                icon: Icon(
-                  _isFollowingOfficialChannel ? Icons.check_rounded : Icons.add_rounded,
-                  size: 16,
-                ),
-                onPressed: () {
-                  setState(() => _isFollowingOfficialChannel = !_isFollowingOfficialChannel);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        _isFollowingOfficialChannel
-                            ? 'Berhasil mengikuti Saluran Resmi RenChat!'
-                            : 'Berhenti mengikuti Saluran Resmi RenChat',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF008069),
+                        shape: BoxShape.circle,
                       ),
+                      child: const Icon(Icons.verified_rounded, color: Colors.white, size: 22),
                     ),
-                  );
-                },
-                label: Text(_isFollowingOfficialChannel ? 'Following' : 'Follow'),
+                    title: const Row(
+                      children: [
+                        Text('RenChat Official', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        SizedBox(width: 6),
+                        Icon(Icons.check_circle_rounded, color: WhatsAppTheme.primaryTeal, size: 16),
+                      ],
+                    ),
+                    subtitle: const Text('Saluran Informasi Pembaruan & Fitur Resmi', style: TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 12)),
+                    trailing: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _isFollowingOfficialChannel ? Colors.white : WhatsAppTheme.primaryTeal,
+                        backgroundColor: _isFollowingOfficialChannel ? WhatsAppTheme.primaryTeal : null,
+                        side: const BorderSide(color: WhatsAppTheme.primaryTeal),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      icon: Icon(
+                        _isFollowingOfficialChannel ? Icons.check_rounded : Icons.add_rounded,
+                        size: 16,
+                      ),
+                      onPressed: () {
+                        setState(() => _isFollowingOfficialChannel = !_isFollowingOfficialChannel);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              _isFollowingOfficialChannel
+                                  ? 'Berhasil mengikuti Saluran Resmi RenChat!'
+                                  : 'Berhenti mengikuti Saluran Resmi RenChat',
+                            ),
+                          ),
+                        );
+                      },
+                      label: Text(_isFollowingOfficialChannel ? 'Mengikuti' : 'Ikuti'),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: WhatsAppTheme.darkChatBg,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      'VERSI TERBARU',
+                                      style: TextStyle(color: WhatsAppTheme.primaryTeal, fontSize: 10.5, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('v1.3.8 Live', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                '📢 Catatan Rilis Resmi RenChat:\n'
+                                '• Status Realtime Typing yang responsif & akurat tanpa status palsu.\n'
+                                '• Kustomisasi wallpaper chat dengan foto pribadi dari Galeri Anda.\n'
+                                '• Sistem Panggilan Telepon cerdas: nada panggil berdering hanya jika penerima online/terhubung.\n'
+                                '• Manajemen Komunitas: pembuat & admin dapat menghapus komunitas.\n'
+                                '• Antarmuka Bahasa Indonesia baku dan animasi ultra smooth.',
+                                style: TextStyle(fontSize: 12.5, color: Colors.white70, height: 1.4),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton.icon(
+                              icon: const Icon(Icons.open_in_new_rounded, size: 16, color: WhatsAppTheme.primaryTeal),
+                              label: const Text('Buka Rilis GitHub', style: TextStyle(color: WhatsAppTheme.primaryTeal, fontWeight: FontWeight.bold, fontSize: 12.5)),
+                              onPressed: () async {
+                                final url = Uri.parse('https://github.com/rendihomeofficial-sudo/RendChat/releases');
+                                if (await canLaunchUrl(url)) {
+                                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                                }
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: WhatsAppTheme.primaryTeal,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              ),
+                              icon: const Icon(Icons.system_update_rounded, size: 16),
+                              label: const Text('Periksa Update', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                              onPressed: () {
+                                AppUpdateService.instance.checkUpdate(silentIfUpToDate: false);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Memeriksa pembaruan resmi RenChat...')),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1679,7 +1795,7 @@ class _WhatsAppChatTile extends StatelessWidget {
                   isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
                   color: isPinned ? WhatsAppTheme.primaryTeal : null,
                 ),
-                title: Text(isPinned ? 'Unpin chat' : 'Pin chat'),
+                title: Text(isPinned ? 'Lepas sematan' : 'Sematkan obrolan'),
                 onTap: () async {
                   Navigator.pop(ctx);
                   try {
@@ -1689,7 +1805,7 @@ class _WhatsAppChatTile extends StatelessWidget {
                     );
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(pinned ? 'Chat pinned' : 'Chat unpinned')),
+                        SnackBar(content: Text(pinned ? 'Obrolan disematkan' : 'Sematan obrolan dilepas')),
                       );
                     }
                   } catch (e) {
@@ -1703,7 +1819,7 @@ class _WhatsAppChatTile extends StatelessWidget {
               ),
               ListTile(
                 leading: const Icon(Icons.archive_outlined),
-                title: const Text('Archive chat'),
+                title: const Text('Arsipkan obrolan'),
                 onTap: () async {
                   Navigator.pop(ctx);
                   await chatService.toggleArchiveChat(
@@ -1712,15 +1828,15 @@ class _WhatsAppChatTile extends StatelessWidget {
                   );
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Chat archived')),
+                      const SnackBar(content: Text('Obrolan diarsipkan')),
                     );
                   }
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.lock_outline_rounded),
-                title: const Text('Lock chat'),
-                subtitle: const Text('Hide and lock this chat with passcode'),
+                title: const Text('Kunci obrolan'),
+                subtitle: const Text('Sembunyikan dan amankan obrolan dengan sandi'),
                 onTap: () async {
                   Navigator.pop(ctx);
                   await chatService.toggleLockChat(
@@ -1729,18 +1845,87 @@ class _WhatsAppChatTile extends StatelessWidget {
                   );
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Chat moved to Locked Chats')),
+                      const SnackBar(content: Text('Obrolan dipindahkan ke Obrolan Terkunci')),
                     );
                   }
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.mark_chat_unread_outlined),
-                title: const Text('Mark as unread'),
+                title: const Text('Tandai belum dibaca'),
                 onTap: () {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Marked as unread')),
+                    const SnackBar(content: Text('Ditandai belum dibaca')),
+                  );
+                },
+              ),
+              // Opsi Hapus Komunitas / Grup Obrolan
+              ListTile(
+                leading: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent),
+                title: Text(
+                  chat.isGroup ? 'Hapus Komunitas / Grup' : 'Hapus Obrolan',
+                  style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  chat.isGroup
+                      ? 'Hapus komunitas ini beserta seluruh pesannya'
+                      : 'Hapus seluruh riwayat obrolan ini',
+                  style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  showDialog(
+                    context: context,
+                    builder: (dCtx) => AlertDialog(
+                      backgroundColor: WhatsAppTheme.darkSurface,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      title: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                          const SizedBox(width: 8),
+                          Text(chat.isGroup ? 'Hapus Komunitas?' : 'Hapus Obrolan?'),
+                        ],
+                      ),
+                      content: Text(
+                        chat.isGroup
+                            ? 'Apakah Anda yakin ingin menghapus komunitas "${chat.title ?? 'ini'}"? Tindakan ini akan menghapus semua pesan dan grup tidak dapat dipulihkan.'
+                            : 'Apakah Anda yakin ingin menghapus seluruh riwayat obrolan ini secara permanen?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dCtx),
+                          child: const Text('Batal', style: TextStyle(color: WhatsAppTheme.darkTextSecondary)),
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+                          onPressed: () async {
+                            Navigator.pop(dCtx);
+                            try {
+                              await chatService.deleteChat(chat.id);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      chat.isGroup
+                                          ? 'Komunitas berhasil dihapus'
+                                          : 'Obrolan berhasil dihapus',
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Gagal menghapus: $e')),
+                                );
+                              }
+                            }
+                          },
+                          child: const Text('Hapus Permanen'),
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),

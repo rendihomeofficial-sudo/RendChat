@@ -16,6 +16,7 @@ class SettingsService extends ChangeNotifier {
   static const String _profilePhotoKey = 'settings_profile_photo_privacy';
   static const String _aboutKey = 'settings_about_privacy';
   static const String _chatWallpaperKey = 'settings_chat_wallpaper';
+  static const String _customWallpaperPathKey = 'settings_custom_wallpaper_path';
   static const String _lastBackupKey = 'settings_last_backup_time';
   static const String _appLanguageKey = 'settings_app_language';
   static const String _netSentBytesKey = 'settings_net_sent_bytes';
@@ -28,8 +29,9 @@ class SettingsService extends ChangeNotifier {
   String _profilePhotoPrivacy = 'My contacts';
   String _aboutPrivacy = 'Everyone';
   String _chatWallpaper = 'Default Doodle';
+  String? _customWallpaperPath;
   String _lastBackupTime = 'Belum pernah';
-  String _appLanguage = 'English';
+  String _appLanguage = 'Indonesian';
   int _netSentBytes = 0;
   int _netRecvBytes = 0;
 
@@ -40,6 +42,7 @@ class SettingsService extends ChangeNotifier {
   String get profilePhotoPrivacy => _profilePhotoPrivacy;
   String get aboutPrivacy => _aboutPrivacy;
   String get chatWallpaper => _chatWallpaper;
+  String? get customWallpaperPath => _customWallpaperPath;
   String get lastBackupTime => _lastBackupTime;
   String get appLanguage => _appLanguage;
   int get netSentBytes => _netSentBytes;
@@ -83,6 +86,11 @@ class SettingsService extends ChangeNotifier {
 
       final wp = prefs.getString(_chatWallpaperKey);
       if (wp != null) _chatWallpaper = wp;
+
+      final cwp = prefs.getString(_customWallpaperPathKey);
+      if (cwp != null && File(cwp).existsSync()) {
+        _customWallpaperPath = cwp;
+      }
 
       final lb = prefs.getString(_lastBackupKey);
       if (lb != null) _lastBackupTime = lb;
@@ -153,6 +161,21 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_chatWallpaperKey, val);
+  }
+
+  Future<void> setCustomWallpaperPath(String? path) async {
+    _customWallpaperPath = path;
+    if (path != null) {
+      _chatWallpaper = 'Custom Photo';
+    }
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    if (path != null) {
+      await prefs.setString(_customWallpaperPathKey, path);
+      await prefs.setString(_chatWallpaperKey, 'Custom Photo');
+    } else {
+      await prefs.remove(_customWallpaperPathKey);
+    }
   }
 
   Future<void> setAppLanguage(String val) async {

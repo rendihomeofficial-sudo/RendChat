@@ -36,11 +36,13 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   bool _isVideoOff = false;
   bool _isFrontCamera = true;
   bool _isConnected = false;
+  bool _isRinging = false; // True jika penerima online/tersambung
   bool _isHolding = false;
   int _callSeconds = 0;
   Timer? _callTimer;
   Timer? _connectTimer;
   StreamSubscription<CallModel?>? _callStatusSub;
+  StreamSubscription<AppUser?>? _receiverPresenceSub;
   String? _activeCallId;
 
   // Pulse ring animation
@@ -72,18 +74,22 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   }
 
   void _startCallingSound() {
-    // Only play calling ring-back tone if this device is the caller (originating call)
+    // Bunyikan nada panggil berdering HANYA jika penerima terdeteksi online / ringing
     if (widget.existingCallId == null) {
-      _ringtonePlayer = AudioPlayer();
-      _playCallingToneBurst();
-      // Pola nada dering panggil: nada panggil berulang setiap 3.2 detik seperti telepon WhatsApp
-      _ringtoneTimer = Timer.periodic(const Duration(milliseconds: 3200), (t) {
-        if (!_isConnected && mounted) {
-          _playCallingToneBurst();
-        } else {
-          t.cancel();
-        }
-      });
+      if (_ringtonePlayer == null) {
+        _ringtonePlayer = AudioPlayer();
+      }
+      if (_isRinging && !_isConnected) {
+        _playCallingToneBurst();
+        _ringtoneTimer?.cancel();
+        _ringtoneTimer = Timer.periodic(const Duration(milliseconds: 3200), (t) {
+          if (!_isConnected && _isRinging && mounted) {
+            _playCallingToneBurst();
+          } else {
+            t.cancel();
+          }
+        });
+      }
     }
   }
 
@@ -137,6 +143,23 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       return;
     }
     if (widget.receiverId != null) {
+      // Pantau status kehadiran penerima secara langsung
+      final chatService = context.read<ChatService>();
+      _receiverPresenceSub = chatService.streamUserProfile(widget.receiverId!).listen((user) {
+        if (!mounted || _isConnected) return;
+        final isOnline = user?.online ?? false;
+        if (isOnline != _isRinging) {
+          setState(() {
+            _isRinging = isOnline;
+          });
+          if (isOnline) {
+            _startCallingSound();
+          } else {
+            _stopCallingSound();
+          }
+        }
+      });
+
       final auth = context.read<AuthService>();
       final currentUser = auth.appUser;
       if (currentUser != null) {
@@ -220,6 +243,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    _receiverPresenceSub?.cancel();
     _stopCallingSound();
     _pulseController.dispose();
     _connectTimer?.cancel();
@@ -391,10 +415,14 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                       ),
                     Text(
                       !_isConnected
-                          ? (widget.isVideo ? 'RenChat video call...' : 'Ringing...')
+                          ? (_isRinging
+                              ? (widget.isVideo ? 'Panggilan video berdering...' : 'Berdering...')
+                              : (widget.isVideo ? 'Memanggil video...' : 'Memanggil...'))
                           : _formatDuration(_callSeconds),
                       style: TextStyle(
-                        color: _isConnected ? WhatsAppTheme.primaryTeal : WhatsAppTheme.darkTextSecondary,
+                        color: _isConnected
+                            ? WhatsAppTheme.primaryTeal
+                            : (_isRinging ? Colors.white70 : WhatsAppTheme.darkTextSecondary),
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
                       ),

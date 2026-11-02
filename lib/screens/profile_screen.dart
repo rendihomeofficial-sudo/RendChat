@@ -968,54 +968,121 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           final currentColor = settings.wallpaperColor;
+          final customPath = settings.customWallpaperPath;
+
           return AlertDialog(
             backgroundColor: WhatsAppTheme.darkSurface,
-            title: const Text('Chat Wallpaper'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
               children: [
-                Container(
-                  height: 140,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: currentColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: WhatsAppTheme.primaryTeal, width: 2),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Preview: ${settings.chatWallpaper}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                Icon(Icons.wallpaper_rounded, color: WhatsAppTheme.primaryTeal),
+                SizedBox(width: 8),
+                Text('Wallpaper Obrolan'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      height: 160,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: currentColor,
+                        border: Border.all(color: WhatsAppTheme.primaryTeal, width: 2),
+                      ),
+                      child: customPath != null && File(customPath).existsSync() && settings.chatWallpaper == 'Custom Photo'
+                          ? Image.file(
+                              File(customPath),
+                              fit: BoxFit.cover,
+                            )
+                          : Center(
+                              child: Text(
+                                'Pratinjau: ${settings.chatWallpaper}',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                            ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Pilih tema latar belakang untuk semua obrolan Anda:',
-                  style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary),
-                ),
-                const SizedBox(height: 10),
-                ...options.map((opt) {
-                  final isSelected = settings.chatWallpaper == opt;
-                  return RadioListTile<String>(
-                    dense: true,
-                    title: Text(opt, style: const TextStyle(fontSize: 14)),
-                    value: opt,
-                    groupValue: settings.chatWallpaper,
-                    activeColor: WhatsAppTheme.primaryTeal,
-                    onChanged: (val) {
-                      if (val != null) {
-                        settings.setChatWallpaper(val);
-                        setDialogState(() {});
+                  const SizedBox(height: 16),
+                  // Tombol Pilih Foto Pribadi dari Galeri
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: WhatsAppTheme.primaryTeal,
+                      side: const BorderSide(color: WhatsAppTheme.primaryTeal),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    ),
+                    icon: const Icon(Icons.photo_library_rounded),
+                    label: const Text('Pilih Foto dari Galeri Pribadi'),
+                    onPressed: () async {
+                      try {
+                        final picker = ImagePicker();
+                        final picked = await picker.pickImage(
+                          source: ImageSource.gallery,
+                          maxWidth: 1920,
+                          maxHeight: 1920,
+                          imageQuality: 90,
+                        );
+                        if (picked != null) {
+                          await settings.setCustomWallpaperPath(picked.path);
+                          setDialogState(() {});
+                        }
+                      } catch (e) {
+                        debugPrint('Error picking custom wallpaper: $e');
                       }
                     },
-                  );
-                }),
-              ],
+                  ),
+                  if (customPath != null) ...[
+                    const SizedBox(height: 6),
+                    TextButton.icon(
+                      style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                      label: const Text('Hapus Wallpaper Foto Pribadi'),
+                      onPressed: () async {
+                        await settings.setCustomWallpaperPath(null);
+                        await settings.setChatWallpaper('Default Doodle');
+                        setDialogState(() {});
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Atau pilih tema warna baku:',
+                      style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ...options.map((opt) {
+                    final isSelected = settings.chatWallpaper == opt;
+                    return RadioListTile<String>(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(opt, style: const TextStyle(fontSize: 14)),
+                      value: opt,
+                      groupValue: settings.chatWallpaper,
+                      activeColor: WhatsAppTheme.primaryTeal,
+                      onChanged: (val) {
+                        if (val != null) {
+                          settings.setChatWallpaper(val);
+                          setDialogState(() {});
+                        }
+                      },
+                    );
+                  }),
+                ],
+              ),
             ),
             actions: [
               FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+                style: FilledButton.styleFrom(
+                  backgroundColor: WhatsAppTheme.primaryTeal,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
                 onPressed: () {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(

@@ -425,17 +425,22 @@ class ChatService {
         .collection('typing')
         .doc(userId);
 
-    if (isTyping) {
-      await typingRef.set({
-        'userName': userName,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-    } else {
-      await typingRef.delete();
+    try {
+      if (isTyping) {
+        await typingRef.set({
+          'userName': userName,
+          'timestamp': FieldValue.serverTimestamp(),
+          'epochMs': DateTime.now().millisecondsSinceEpoch,
+        });
+      } else {
+        await typingRef.delete();
+      }
+    } catch (e) {
+      debugPrint('Error updating typing status: $e');
     }
   }
 
-  // Stream typing users
+  // Stream typing users (dengan filter dokumen kadaluarsa > 7 detik)
   Stream<List<String>> streamTypingUsers(String chatId, String currentUserId) {
     return _firestore
         .collection('chats')
@@ -443,10 +448,35 @@ class ChatService {
         .collection('typing')
         .snapshots()
         .map((snap) {
-      return snap.docs
-          .where((d) => d.id != currentUserId)
-          .map((d) => d.data()['userName'] as String? ?? 'Someone')
-          .toList();
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final activeTypers = <String>[];
+
+      for (final doc in snap.docs) {
+        if (doc.id == currentUserId) continue;
+        final data = doc.data();
+        final epochMs = data['epochMs'] as int?;
+        final ts = data['timestamp'] as Timestamp?;
+
+        // Validasi keaktifan: buang status jika sudah lebih dari 7 detik
+        bool isFresh = false;
+        if (epochMs != null) {
+          isFresh = (nowMs - epochMs) < 7000;
+        } else if (ts != null) {
+          isFresh = DateTime.now().difference(ts.toDate()).inSeconds < 7;
+        }
+
+        if (isFresh) {
+          final name = data['userName'] as String? ?? 'Seseorang';
+          if (!activeTypers.contains(name)) {
+            activeTypers.add(name);
+          }
+        } else {
+          // Bersihkan dokumen typing stale dari database secara otomatis
+          doc.reference.delete().catchError((_) {});
+        }
+      }
+
+      return activeTypers;
     });
   }
 
@@ -758,6 +788,31 @@ class ChatService {
       }
     } catch (e) {
       debugPrint('Error clearing all user chats: $e');
+      rethrow;
+    }
+  }
+
+  // Hapus grup atau komunitas beserta seluruh riwayat obrolan secara permanen
+  Future<void> deleteChat(String chatId) async {
+    try {
+      // 1. Hapus semua pesan di subkoleksi
+      final messagesSnap = await _messagesRef(chatId).get();
+      final batch = _firestore.batch();
+      for (final doc in messagesSnap.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+
+      // 2. Hapus indikator typing jika ada
+      final typingSnap = await _firestore.collection('chats').doc(chatId).collection('typing').get();
+      for (final doc in typingSnap.docs) {
+        await doc.reference.delete().catchError((_) {});
+      }
+
+      // 3. Hapus dokumen chat utama
+      await _chatsRef.doc(chatId).delete();
+    } catch (e) {
+      debugPrint('Error deleting chat/community: $e');
       rethrow;
     }
   }
