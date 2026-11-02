@@ -279,6 +279,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
         _startTimer();
       } else if (call.status == 'rejected' || call.status == 'ended' || call.status == 'missed') {
         _stopCallingSound();
+        CallHistoryManager.instance.recordCall(call);
         _safeExitCall();
       }
     });
