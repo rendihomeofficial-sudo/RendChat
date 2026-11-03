@@ -1965,6 +1965,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
             subtitle: _appLanguage,
             onTap: _showAppLanguageDialog,
           ),
+          Consumer<AppUpdateService>(
+            builder: (context, updateService, _) {
+              final hasUpdate = updateService.hasUpdate;
+              return _settingsTile(
+                icon: Icons.system_update_rounded,
+                iconColor: WhatsAppTheme.primaryTeal,
+                title: 'Pembaruan aplikasi',
+                subtitle: hasUpdate
+                    ? 'Versi baru v${updateService.updateInfo!.version} tersedia'
+                    : 'RenChat v${updateService.currentVersion} (Paling Baru)',
+                trailing: hasUpdate
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: WhatsAppTheme.primaryTeal,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'Update',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.check_circle_rounded,
+                        color: WhatsAppTheme.primaryTeal,
+                        size: 20,
+                      ),
+                onTap: () => showUpdateDialog(context),
+              );
+            },
+          ),
           _settingsTile(
             icon: Icons.help_outline_rounded,
             title: 'Help',
@@ -2049,9 +2084,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    Color? iconColor,
+    Widget? trailing,
   }) {
     return ListTile(
-      leading: Icon(icon, color: WhatsAppTheme.darkTextSecondary, size: 24),
+      leading: Icon(icon, color: iconColor ?? WhatsAppTheme.darkTextSecondary, size: 24),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
       subtitle: subtitle.isNotEmpty
           ? Text(
@@ -2059,6 +2096,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: const TextStyle(color: WhatsAppTheme.darkTextSecondary, fontSize: 13),
             )
           : null,
+      trailing: trailing,
       onTap: onTap,
     );
   }
