@@ -64,6 +64,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _isSearching = false;
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  int _matchedMessageCount = 0;
 
   // Real Audio Recorder & Voice Note Preview System
   late final AudioRecorder _audioRecorder;
@@ -1664,7 +1665,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 autofocus: true,
                 style: const TextStyle(color: Colors.white, fontSize: 16),
                 decoration: const InputDecoration(
-                  hintText: 'Search...',
+                  hintText: 'Cari dalam obrolan...',
                   hintStyle: TextStyle(color: WhatsAppTheme.darkTextSecondary),
                   border: InputBorder.none,
                 ),
@@ -1746,15 +1747,53 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         actions: _isSearching
             ? [
                 if (_searchQuery.isNotEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.4),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          '$_matchedMessageCount hasil',
+                          style: const TextStyle(
+                            color: WhatsAppTheme.primaryTeal,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_searchQuery.isNotEmpty)
                   IconButton(
                     icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Hapus kata kunci',
                     onPressed: () {
                       _searchController.clear();
-                      setState(() => _searchQuery = '');
+                      setState(() {
+                        _searchQuery = '';
+                        _matchedMessageCount = 0;
+                      });
                     },
                   ),
               ]
             : [
+                IconButton(
+                  icon: const Icon(Icons.search_rounded),
+                  tooltip: 'Cari pesan',
+                  onPressed: () {
+                    setState(() {
+                      _isSearching = true;
+                    });
+                  },
+                ),
                 IconButton(
                   icon: const Icon(Icons.videocam_rounded),
                   tooltip: 'Video call',
@@ -1916,6 +1955,59 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                   (m.fileName?.toLowerCase().contains(_searchQuery) ?? false))
                               .toList();
 
+                      // Sinkronkan jumlah pesan yang cocok dengan query pencarian
+                      if (_searchQuery.isNotEmpty && _matchedMessageCount != messages.length) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) {
+                            setState(() => _matchedMessageCount = messages.length);
+                          }
+                        });
+                      }
+
+                      // Tampilan kosong jika pencarian tidak menemukan kecocokan
+                      if (_searchQuery.isNotEmpty && messages.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(22),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.search_off_rounded,
+                                    size: 52,
+                                    color: WhatsAppTheme.darkTextSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+                                const Text(
+                                  'Tidak ada pesan yang cocok',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tidak ditemukan hasil untuk "$_searchQuery"',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: WhatsAppTheme.darkTextSecondary,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
                       // Deteksi pesan baru: scroll ke bawah hanya jika pengguna
                       // sedang berada di posisi teratas (tidak sedang membaca riwayat lama).
                       if (messages.length > _lastMessageCount) {
@@ -1975,6 +2067,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                   currentUserId: currentUser.uid,
                                   chatId: widget.chat.id,
                                   pinnedMessageId: currentChat.pinnedMessageId,
+                                  searchQuery: _searchQuery,
                                   onReply: () {
                                     setState(() {
                                       _replyingToMessage = msg;
@@ -2522,6 +2615,7 @@ class _WhatsAppMessageBubble extends StatelessWidget {
   final String chatId;
   final VoidCallback onReply;
   final String? pinnedMessageId;
+  final String searchQuery;
 
   const _WhatsAppMessageBubble({
     required this.message,
@@ -2531,7 +2625,76 @@ class _WhatsAppMessageBubble extends StatelessWidget {
     required this.chatId,
     required this.onReply,
     this.pinnedMessageId,
+    this.searchQuery = '',
   });
+
+  Widget _buildHighlightedText({
+    required String text,
+    required Color defaultColor,
+    double fontSize = 15.5,
+    FontWeight fontWeight = FontWeight.normal,
+    int? maxLines,
+  }) {
+    if (searchQuery.isEmpty || !text.toLowerCase().contains(searchQuery.toLowerCase())) {
+      return Text(
+        text,
+        maxLines: maxLines,
+        overflow: maxLines != null ? TextOverflow.ellipsis : null,
+        style: TextStyle(
+          fontSize: fontSize,
+          color: defaultColor,
+          fontWeight: fontWeight,
+          height: 1.25,
+        ),
+      );
+    }
+
+    final lowerText = text.toLowerCase();
+    final lowerQuery = searchQuery.toLowerCase();
+    final spans = <TextSpan>[];
+    int start = 0;
+
+    while (true) {
+      final index = lowerText.indexOf(lowerQuery, start);
+      if (index == -1) {
+        if (start < text.length) {
+          spans.add(TextSpan(text: text.substring(start)));
+        }
+        break;
+      }
+
+      if (index > start) {
+        spans.add(TextSpan(text: text.substring(start, index)));
+      }
+
+      spans.add(
+        TextSpan(
+          text: text.substring(index, index + searchQuery.length),
+          style: const TextStyle(
+            backgroundColor: Color(0xFFFFD54F),
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+
+      start = index + searchQuery.length;
+    }
+
+    return RichText(
+      maxLines: maxLines,
+      overflow: maxLines != null ? TextOverflow.ellipsis : TextOverflow.clip,
+      text: TextSpan(
+        style: TextStyle(
+          fontSize: fontSize,
+          color: defaultColor,
+          fontWeight: fontWeight,
+          height: 1.25,
+        ),
+        children: spans,
+      ),
+    );
+  }
 
   void _showReactionPicker(BuildContext context) {
     final emojis = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -3265,7 +3428,7 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                 ),
                 if (message.text.isNotEmpty && message.text != 'Photo' && message.text != message.fileName) ...[
                   const SizedBox(height: 6),
-                  Text(message.text, style: const TextStyle(color: fg, fontSize: 15)),
+                  _buildHighlightedText(text: message.text, defaultColor: fg, fontSize: 15),
                 ],
               ] else if (message.type == MessageType.file) ...[
                 InkWell(
@@ -3301,15 +3464,12 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                message.fileName ?? message.text,
+                              _buildHighlightedText(
+                                text: message.fileName ?? message.text,
+                                defaultColor: fg,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
                                 maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13.5,
-                                  color: fg,
-                                ),
                               ),
                               const SizedBox(height: 3),
                               Row(
@@ -3362,9 +3522,10 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                   ),
                 ),
               ] else ...[
-                Text(
-                  message.text,
-                  style: const TextStyle(fontSize: 15.5, color: fg, height: 1.25),
+                _buildHighlightedText(
+                  text: message.text,
+                  defaultColor: fg,
+                  fontSize: 15.5,
                 ),
               ],
               const SizedBox(height: 3),
