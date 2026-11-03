@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/chat_model.dart';
 import '../models/message_model.dart';
 import '../services/auth_service.dart';

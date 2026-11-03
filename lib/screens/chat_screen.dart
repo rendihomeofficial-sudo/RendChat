@@ -2683,16 +2683,16 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                         itemBuilder: (context, index) {
                           final targetChat = targetChats[index];
                           final title = targetChat.isGroup
-                              ? targetChat.title
+                              ? (targetChat.title ?? 'Grup')
                               : targetChat.otherParticipantName(currentUser.uid);
                           final avatar = targetChat.isGroup
-                              ? targetChat.photoUrl
+                              ? targetChat.photoURL
                               : targetChat.otherParticipantAvatar(currentUser.uid);
 
                           return ListTile(
                             leading: UserAvatar(
                               name: title,
-                              imageUrl: avatar,
+                              photoUrl: avatar,
                               radius: 22,
                             ),
                             title: Text(
