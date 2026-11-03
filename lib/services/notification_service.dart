@@ -65,7 +65,7 @@ class NotificationService {
     try {
       final doc = await _firestore.collection('chats').doc(chatId).get();
       if (!doc.exists) return;
-      final chat = Chat.fromFirestore(doc);
+      final chat = Chat.fromFirestore(doc, null);
 
       rootNavigatorKey.currentState?.push(
         MaterialPageRoute(builder: (_) => ChatScreen(chat: chat)),
