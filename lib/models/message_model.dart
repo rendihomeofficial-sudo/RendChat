@@ -52,6 +52,9 @@ class Message {
   final bool isViewOnce;
   final List<String> viewedBy; // list of userIds who opened viewOnce
 
+  // Forwarded message
+  final bool isForwarded;
+
   const Message({
     required this.id,
     required this.chatId,
@@ -80,6 +83,7 @@ class Message {
     this.pollVotes = const {},
     this.isViewOnce = false,
     this.viewedBy = const [],
+    this.isForwarded = false,
   });
 
   bool isStarredBy(String userId) => starredBy.contains(userId);
@@ -146,6 +150,7 @@ class Message {
       pollVotes: pollVotes,
       isViewOnce: data['isViewOnce'] as bool? ?? false,
       viewedBy: (data['viewedBy'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      isForwarded: data['isForwarded'] as bool? ?? false,
     );
   }
 
@@ -177,6 +182,7 @@ class Message {
       'pollVotes': pollVotes,
       'isViewOnce': isViewOnce,
       'viewedBy': viewedBy,
+      'isForwarded': isForwarded,
     };
   }
 
@@ -198,6 +204,7 @@ class Message {
     Map<String, List<String>>? pollVotes,
     bool? isViewOnce,
     List<String>? viewedBy,
+    bool? isForwarded,
   }) {
     return Message(
       id: id,
@@ -227,6 +234,7 @@ class Message {
       pollVotes: pollVotes ?? this.pollVotes,
       isViewOnce: isViewOnce ?? this.isViewOnce,
       viewedBy: viewedBy ?? this.viewedBy,
+      isForwarded: isForwarded ?? this.isForwarded,
     );
   }
 

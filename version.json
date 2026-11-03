@@ -1,8 +1,8 @@
 {
-  "version": "1.3.17",
-  "version_code": 30,
-  "title": "RenChat v1.3.17 - Saluran Notifikasi Prioritas Tinggi & Sinkronisasi Riwayat Panggilan",
-  "release_notes": "• Saluran Notifikasi Prioritas Tinggi (Android): Menginisialisasi saluran 'Pesan Obrolan' dan 'Panggilan Masuk' secara eksplisit di MainActivity dengan IMPORTANCE_HIGH dan VISIBILITY_PUBLIC untuk keandalan banner heads-up serta layar terkunci.\n• Sinkronisasi Riwayat Panggilan Cepat: Memperbarui CallHistoryManager secara langsung saat panggilan ditolak, diakhiri, atau tak terjawab oleh pihak lawan.\n• Pemindai QR & Salin Tautan: Akses kamera instan pada tautan perangkat dan tombol salin tautan panggilan/status ke papan klip sistem.",
+  "version": "1.3.18",
+  "version_code": 31,
+  "title": "RenChat v1.3.18 - Pengiriman Dokumen PDF, Teruskan Pesan & Sematkan Pesan Obrolan",
+  "release_notes": "• Dukungan Pengiriman Dokumen & File PDF: Kirim dan terima berkas PDF, Word, Excel, PowerPoint, TXT, dan Arsip dengan tampilan kartu berwarna adaptif serta ukuran berkas riil di chat.\n• Fitur Teruskan Pesan (Forward Message): Teruskan teks, media, VN, polling, dan dokumen ke kontak atau grup lain dengan indikator 'Diteruskan' khas WhatsApp.\n• Sematkan Pesan di Obrolan (Pin Message): Tempelkan pesan penting di bagian atas obrolan dengan floating banner interaktif dan tombol lepas sematan (unpin) cepat.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }

@@ -93,17 +93,51 @@ class MediaGalleryScreen extends StatelessWidget {
                             separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
                             itemBuilder: (context, idx) {
                               final msg = docMsgs[idx];
+                              final ext = (msg.fileName != null && msg.fileName!.contains('.'))
+                                  ? msg.fileName!.split('.').last.toLowerCase()
+                                  : '';
+                              final isPdf = ext == 'pdf';
+                              final docColor = isPdf ? const Color(0xFFE53935) : WhatsAppTheme.primaryTeal;
+
                               return ListTile(
+                                onTap: () async {
+                                  final url = msg.mediaUrl;
+                                  if (url != null && url.isNotEmpty) {
+                                    final uri = Uri.tryParse(url);
+                                    if (uri != null && await canLaunchUrl(uri)) {
+                                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                    }
+                                  }
+                                },
                                 leading: Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF2A3942),
+                                    color: docColor.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: const Icon(Icons.insert_drive_file, color: Colors.redAccent),
+                                  child: Icon(
+                                    isPdf ? Icons.picture_as_pdf_rounded : Icons.insert_drive_file_rounded,
+                                    color: docColor,
+                                  ),
                                 ),
                                 title: Text(msg.fileName ?? 'Document', maxLines: 1, overflow: TextOverflow.ellipsis),
-                                subtitle: Text('${((msg.fileSize ?? 0) / 1024).toStringAsFixed(1)} KB'),
+                                subtitle: Row(
+                                  children: [
+                                    Text('${((msg.fileSize ?? 0) / 1024).toStringAsFixed(1)} KB'),
+                                    if (ext.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '• ${ext.toUpperCase()}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11,
+                                          color: docColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                trailing: const Icon(Icons.download_rounded, size: 20, color: WhatsAppTheme.darkTextSecondary),
                               );
                             },
                           ),

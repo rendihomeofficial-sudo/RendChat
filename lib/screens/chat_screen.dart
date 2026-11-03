@@ -421,7 +421,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _pickAndSendAnyFile() async {
+  Future<void> _pickAndSendAnyFile({bool documentOnly = false}) async {
     final auth = context.read<AuthService>();
     final chatService = context.read<ChatService>();
     final storageService = context.read<StorageService>();
@@ -429,7 +429,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (user == null) return;
 
     try {
-      final files = await FilePicker.pickFiles(type: FileType.any);
+      final files = documentOnly
+          ? await FilePicker.pickFiles(
+              type: FileType.custom,
+              allowedExtensions: [
+                'pdf',
+                'doc',
+                'docx',
+                'xls',
+                'xlsx',
+                'ppt',
+                'pptx',
+                'txt',
+                'csv',
+                'zip',
+                'rar',
+                '7z',
+              ],
+            )
+          : await FilePicker.pickFiles(type: FileType.any);
       if (files.isEmpty) return;
 
       final file = files.first;
@@ -437,7 +455,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
       setState(() {
         _isUploading = true;
-        _uploadStatus = 'Uploading $fileName...';
+        _uploadStatus = 'Mengunggah $fileName...';
       });
 
       final bytes = await file.xFile.readAsBytes();
@@ -1225,7 +1243,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     color: WhatsAppTheme.attachDocument,
                     onTap: () {
                       Navigator.pop(ctx);
-                      _pickAndSendAnyFile();
+                      _pickAndSendAnyFile(documentOnly: true);
                     },
                   ),
                   _attachmentItem(
@@ -1680,7 +1698,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                               parent: BouncingScrollPhysics(),
                             ),
                             cacheExtent: 600,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: EdgeInsets.fromLTRB(
+                              10,
+                              8,
+                              10,
+                              (currentChat.pinnedMessageId != null ? 58.0 : 8.0),
+                            ),
                             itemCount: messages.length + 1, // +1 for E2EE Banner
                             itemBuilder: (context, index) {
                               if (index == messages.length) {
@@ -1710,6 +1733,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                   isGroup: widget.chat.isGroup,
                                   currentUserId: currentUser.uid,
                                   chatId: widget.chat.id,
+                                  pinnedMessageId: currentChat.pinnedMessageId,
                                   onReply: () {
                                     setState(() {
                                       _replyingToMessage = msg;
@@ -1719,6 +1743,103 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                               );
                             },
                           ),
+                          // Pinned Message WhatsApp Top Banner
+                          if (currentChat.pinnedMessageId != null)
+                            Positioned(
+                              top: 8,
+                              left: 12,
+                              right: 12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: WhatsAppTheme.darkSurface.withValues(alpha: 0.94),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.35),
+                                    width: 1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.18),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(
+                                        Icons.push_pin_rounded,
+                                        size: 18,
+                                        color: WhatsAppTheme.primaryTeal,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              const Text(
+                                                'Pesan Disematkan',
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: WhatsAppTheme.primaryTeal,
+                                                ),
+                                              ),
+                                              if (currentChat.pinnedMessageSenderName != null) ...[
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '• ${currentChat.pinnedMessageSenderName}',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: WhatsAppTheme.darkTextSecondary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            currentChat.pinnedMessageText ?? 'Pesan',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.close_rounded, size: 18, color: WhatsAppTheme.darkTextSecondary),
+                                      tooltip: 'Lepas Sematan',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                      onPressed: () async {
+                                        await chatService.unpinMessageInChat(widget.chat.id);
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Pesan dilepas dari sematan')),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           // Tombol scroll ke pesan terbaru
                           Positioned(
                             right: 12,
@@ -2127,6 +2248,7 @@ class _WhatsAppMessageBubble extends StatelessWidget {
   final String currentUserId;
   final String chatId;
   final VoidCallback onReply;
+  final String? pinnedMessageId;
 
   const _WhatsAppMessageBubble({
     required this.message,
@@ -2135,6 +2257,7 @@ class _WhatsAppMessageBubble extends StatelessWidget {
     required this.currentUserId,
     required this.chatId,
     required this.onReply,
+    this.pinnedMessageId,
   });
 
   void _showReactionPicker(BuildContext context) {
@@ -2223,6 +2346,17 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                   onReply();
                 },
               ),
+              if (!message.deleted) ...[
+                ListTile(
+                  leading: const Icon(Icons.forward_rounded, color: WhatsAppTheme.primaryTeal),
+                  title: const Text('Teruskan'),
+                  subtitle: const Text('Kirim pesan ini ke chat lain', style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showForwardDialog(context);
+                  },
+                ),
+              ],
               ListTile(
                 leading: const Icon(Icons.add_reaction_outlined),
                 title: const Text('Add Reaction'),
@@ -2246,6 +2380,61 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                       );
                 },
               ),
+              if (!message.deleted) ...[
+                ListTile(
+                  leading: Icon(
+                    pinnedMessageId == message.id ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+                    color: pinnedMessageId == message.id ? Colors.amber : WhatsAppTheme.primaryTeal,
+                  ),
+                  title: Text(pinnedMessageId == message.id ? 'Lepas Sematan (Unpin)' : 'Sematkan Pesan (Pin)'),
+                  subtitle: Text(
+                    pinnedMessageId == message.id
+                        ? 'Hapus pesan ini dari bagian atas chat'
+                        : 'Tempelkan pesan ini di bagian atas chat',
+                    style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final cs = context.read<ChatService>();
+                    if (pinnedMessageId == message.id) {
+                      await cs.unpinMessageInChat(chatId);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Pesan dilepas dari sematan')),
+                        );
+                      }
+                    } else {
+                      final textPreview = message.type == MessageType.image
+                          ? '📷 Foto'
+                          : message.type == MessageType.file
+                              ? '📎 ${message.fileName ?? "Dokumen"}'
+                              : message.type == MessageType.voice
+                                  ? '🎤 Pesan Suara'
+                                  : message.text;
+                      await cs.pinMessageInChat(
+                        chatId: chatId,
+                        messageId: message.id,
+                        text: textPreview,
+                        senderName: message.senderName,
+                      );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Row(
+                              children: [
+                                Icon(Icons.push_pin_rounded, color: Colors.white, size: 18),
+                                SizedBox(width: 8),
+                                Text('Pesan berhasil disematkan di atas'),
+                              ],
+                            ),
+                            backgroundColor: WhatsAppTheme.primaryTeal,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ],
               if (!message.deleted && message.type == MessageType.text) ...[
                 ListTile(
                   leading: const Icon(Icons.copy_rounded),
@@ -2409,6 +2598,190 @@ class _WhatsAppMessageBubble extends StatelessWidget {
     );
   }
 
+  void _showForwardDialog(BuildContext context) {
+    final chatService = context.read<ChatService>();
+    final auth = context.read<AuthService>();
+    final currentUser = auth.appUser;
+    if (currentUser == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: WhatsAppTheme.darkSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.92,
+          expand: false,
+          builder: (dCtx, scrollController) {
+            return Column(
+              children: [
+                Container(
+                  width: 38,
+                  height: 4,
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.forward_rounded, color: WhatsAppTheme.primaryTeal),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Teruskan Pesan ke...',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: WhatsAppTheme.darkTextSecondary),
+                        onPressed: () => Navigator.pop(sheetCtx),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFF2A3942)),
+                Expanded(
+                  child: StreamBuilder<List<Chat>>(
+                    stream: chatService.streamUserChats(currentUser.uid),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator(color: WhatsAppTheme.primaryTeal));
+                      }
+                      final allChats = snapshot.data ?? [];
+                      // Filter agar tidak meneruskan ke chat yang sama
+                      final targetChats = allChats.where((c) => c.id != chatId).toList();
+
+                      if (targetChats.isEmpty) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24.0),
+                            child: Text(
+                              'Belum ada obrolan lain untuk diteruskan.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: WhatsAppTheme.darkTextSecondary),
+                            ),
+                          ),
+                        );
+                      }
+
+                      return ListView.separated(
+                        controller: scrollController,
+                        itemCount: targetChats.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1, indent: 72, color: Color(0xFF2A3942)),
+                        itemBuilder: (context, index) {
+                          final targetChat = targetChats[index];
+                          final title = targetChat.isGroup
+                              ? targetChat.title
+                              : targetChat.otherParticipantName(currentUser.uid);
+                          final avatar = targetChat.isGroup
+                              ? targetChat.photoUrl
+                              : targetChat.otherParticipantAvatar(currentUser.uid);
+
+                          return ListTile(
+                            leading: UserAvatar(
+                              name: title,
+                              imageUrl: avatar,
+                              radius: 22,
+                            ),
+                            title: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                            ),
+                            subtitle: Text(
+                              targetChat.isGroup ? 'Grup' : 'Kontak Pribadi',
+                              style: const TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary),
+                            ),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.4)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.send_rounded, size: 14, color: WhatsAppTheme.primaryTeal),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Kirim',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: WhatsAppTheme.primaryTeal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            onTap: () async {
+                              Navigator.pop(sheetCtx);
+                              try {
+                                await chatService.sendMessage(
+                                  chatId: targetChat.id,
+                                  senderId: currentUser.uid,
+                                  senderName: currentUser.displayName,
+                                  text: message.text,
+                                  type: message.type,
+                                  mediaUrl: message.mediaUrl,
+                                  fileName: message.fileName,
+                                  fileSize: message.fileSize,
+                                  durationSeconds: message.durationSeconds,
+                                  pollQuestion: message.pollQuestion,
+                                  pollOptions: message.pollOptions,
+                                  isForwarded: true,
+                                );
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Row(
+                                        children: [
+                                          const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                                          const SizedBox(width: 8),
+                                          Expanded(child: Text('Pesan diteruskan ke $title')),
+                                        ],
+                                      ),
+                                      backgroundColor: WhatsAppTheme.primaryTeal,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Gagal meneruskan pesan: $e')),
+                                  );
+                                }
+                              }
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showEditDialog(BuildContext context) {
     final controller = TextEditingController(text: message.text);
     showDialog(
@@ -2480,6 +2853,27 @@ class _WhatsAppMessageBubble extends StatelessWidget {
           child: Column(
             crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
+              if (message.isForwarded) ...[
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.forward_rounded, size: 13, color: WhatsAppTheme.darkTextSecondary),
+                      SizedBox(width: 4),
+                      Text(
+                        'Diteruskan',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w500,
+                          color: WhatsAppTheme.darkTextSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               if (isGroup && !isMe) ...[
                 Text(
                   message.senderName,
@@ -2603,26 +2997,30 @@ class _WhatsAppMessageBubble extends StatelessWidget {
               ] else if (message.type == MessageType.file) ...[
                 InkWell(
                   onTap: () => _openFile(context),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    constraints: const BoxConstraints(minWidth: 200, maxWidth: 280),
-                    padding: const EdgeInsets.all(8),
+                    constraints: const BoxConstraints(minWidth: 220, maxWidth: 300),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.black.withValues(alpha: 0.28),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _getFileColor(message.fileName ?? '').withValues(alpha: 0.25),
+                        width: 1,
+                      ),
                     ),
                     child: Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.2),
+                            color: _getFileColor(message.fileName ?? '').withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
                             _getFileIcon(message.fileName ?? ''),
                             size: 28,
-                            color: WhatsAppTheme.primaryTeal,
+                            color: _getFileColor(message.fileName ?? ''),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -2632,15 +3030,15 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                             children: [
                               Text(
                                 message.fileName ?? message.text,
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                                  fontSize: 13.5,
                                   color: fg,
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 3),
                               Row(
                                 children: [
                                   if (message.fileSize != null)
@@ -2651,9 +3049,20 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                                         color: WhatsAppTheme.darkTextSecondary,
                                       ),
                                     ),
+                                  if (message.fileName != null && message.fileName!.contains('.')) ...[
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '• ${message.fileName!.split('.').last.toUpperCase()}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: _getFileColor(message.fileName ?? ''),
+                                      ),
+                                    ),
+                                  ],
                                   const SizedBox(width: 6),
                                   const Text(
-                                    '• Tap to open',
+                                    '• Ketuk untuk buka',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w500,
@@ -2665,14 +3074,14 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        const CircleAvatar(
+                        const SizedBox(width: 6),
+                        CircleAvatar(
                           radius: 14,
-                          backgroundColor: Color(0xFF233138),
+                          backgroundColor: const Color(0xFF233138),
                           child: Icon(
-                            Icons.arrow_downward_rounded,
+                            Icons.download_rounded,
                             size: 16,
-                            color: WhatsAppTheme.primaryTeal,
+                            color: _getFileColor(message.fileName ?? ''),
                           ),
                         ),
                       ],
@@ -2974,6 +3383,8 @@ class _WhatsAppMessageBubble extends StatelessWidget {
       case 'ppt':
       case 'pptx':
         return Icons.slideshow_rounded;
+      case 'txt':
+        return Icons.text_snippet_rounded;
       case 'zip':
       case 'rar':
       case '7z':
@@ -2988,8 +3399,44 @@ class _WhatsAppMessageBubble extends StatelessWidget {
       case 'mkv':
       case 'mov':
         return Icons.video_file_rounded;
+      case 'apk':
+        return Icons.android_rounded;
       default:
         return Icons.insert_drive_file_rounded;
+    }
+  }
+
+  Color _getFileColor(String filename) {
+    final ext = filename.contains('.') ? filename.split('.').last.toLowerCase() : '';
+    switch (ext) {
+      case 'pdf':
+        return const Color(0xFFE53935); // WhatsApp Red for PDF
+      case 'doc':
+      case 'docx':
+        return const Color(0xFF1E88E5); // Word Blue
+      case 'xls':
+      case 'xlsx':
+      case 'csv':
+        return const Color(0xFF43A047); // Excel Green
+      case 'ppt':
+      case 'pptx':
+        return const Color(0xFFFFB300); // PowerPoint Orange
+      case 'txt':
+        return const Color(0xFF78909C); // Slate Text
+      case 'zip':
+      case 'rar':
+      case '7z':
+      case 'tar':
+      case 'gz':
+        return const Color(0xFFFB8C00); // Archive Orange
+      case 'mp3':
+      case 'm4a':
+      case 'wav':
+        return const Color(0xFF8E24AA); // Audio Purple
+      case 'apk':
+        return const Color(0xFF2E7D32); // Android Green
+      default:
+        return WhatsAppTheme.primaryTeal;
     }
   }
 

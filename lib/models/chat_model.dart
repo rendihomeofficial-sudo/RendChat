@@ -30,6 +30,12 @@ class Chat {
   // WhatsApp Disappearing Messages: duration in seconds (e.g. 86400 for 24h, null/0 for Off)
   final int? disappearingDuration;
 
+  // WhatsApp Pin Message in Chat: messageId, text, senderName, pinnedAt
+  final String? pinnedMessageId;
+  final String? pinnedMessageText;
+  final String? pinnedMessageSenderName;
+  final DateTime? pinnedMessageAt;
+
   const Chat({
     required this.id,
     required this.isGroup,
@@ -51,6 +57,10 @@ class Chat {
     this.clearedAt = const {},
     this.mutedUntil = const {},
     this.disappearingDuration,
+    this.pinnedMessageId,
+    this.pinnedMessageText,
+    this.pinnedMessageSenderName,
+    this.pinnedMessageAt,
   });
 
   factory Chat.fromFirestore(
@@ -79,6 +89,11 @@ class Chat {
 
     final disappearingDuration = (data['disappearingDuration'] as num?)?.toInt();
 
+    final pinnedMessageId = data['pinnedMessageId'] as String?;
+    final pinnedMessageText = data['pinnedMessageText'] as String?;
+    final pinnedMessageSenderName = data['pinnedMessageSenderName'] as String?;
+    final pinnedMessageAt = data['pinnedMessageAt'] != null ? _parseDateTime(data['pinnedMessageAt']) : null;
+
     return Chat(
       id: snapshot.id,
       isGroup: data['isGroup'] as bool? ?? false,
@@ -100,6 +115,10 @@ class Chat {
       clearedAt: clearedAt,
       mutedUntil: mutedUntil,
       disappearingDuration: disappearingDuration,
+      pinnedMessageId: pinnedMessageId,
+      pinnedMessageText: pinnedMessageText,
+      pinnedMessageSenderName: pinnedMessageSenderName,
+      pinnedMessageAt: pinnedMessageAt,
     );
   }
 
@@ -124,6 +143,10 @@ class Chat {
       'clearedAt': clearedAt.map((k, v) => MapEntry(k, Timestamp.fromDate(v))),
       'mutedUntil': mutedUntil.map((k, v) => MapEntry(k, Timestamp.fromDate(v))),
       if (disappearingDuration != null) 'disappearingDuration': disappearingDuration,
+      if (pinnedMessageId != null) 'pinnedMessageId': pinnedMessageId,
+      if (pinnedMessageText != null) 'pinnedMessageText': pinnedMessageText,
+      if (pinnedMessageSenderName != null) 'pinnedMessageSenderName': pinnedMessageSenderName,
+      if (pinnedMessageAt != null) 'pinnedMessageAt': Timestamp.fromDate(pinnedMessageAt!),
     };
   }
 
@@ -181,6 +204,9 @@ class Chat {
     }
     return null;
   }
+
+  String otherParticipantName(String currentUserId) => getDisplayTitle(currentUserId);
+  String? otherParticipantAvatar(String currentUserId) => getDisplayAvatar(currentUserId);
 
   int getUnreadCount(String currentUserId) {
     return unread[currentUserId] ?? 0;

@@ -193,6 +193,7 @@ class ChatService {
     String? pollQuestion,
     List<String>? pollOptions,
     bool isViewOnce = false,
+    bool isForwarded = false,
   }) async {
     final docRef = _messagesRef(chatId).doc();
     final now = DateTime.now();
@@ -220,6 +221,7 @@ class ChatService {
       pollVotes: const {},
       isViewOnce: isViewOnce,
       viewedBy: const [],
+      isForwarded: isForwarded,
     );
 
     await docRef.set(message);
@@ -613,6 +615,32 @@ class ChatService {
       'disappearingDuration': (durationInSeconds != null && durationInSeconds > 0)
           ? durationInSeconds
           : FieldValue.delete(),
+    });
+  }
+
+  // WhatsApp Pin Message in Chat
+  Future<void> pinMessageInChat({
+    required String chatId,
+    required String messageId,
+    required String text,
+    required String senderName,
+  }) async {
+    final docRef = _chatsRef.doc(chatId);
+    await docRef.update({
+      'pinnedMessageId': messageId,
+      'pinnedMessageText': text,
+      'pinnedMessageSenderName': senderName,
+      'pinnedMessageAt': Timestamp.now(),
+    });
+  }
+
+  Future<void> unpinMessageInChat(String chatId) async {
+    final docRef = _chatsRef.doc(chatId);
+    await docRef.update({
+      'pinnedMessageId': FieldValue.delete(),
+      'pinnedMessageText': FieldValue.delete(),
+      'pinnedMessageSenderName': FieldValue.delete(),
+      'pinnedMessageAt': FieldValue.delete(),
     });
   }
 
