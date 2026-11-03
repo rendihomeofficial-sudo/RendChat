@@ -50,6 +50,8 @@ class AppUpdateService extends ChangeNotifier {
   static const MethodChannel _installerChannel =
       MethodChannel('com.chat.messenger/app_installer');
 
+  static const String _githubContentsRawUrl =
+      'https://api.github.com/repos/rendihomeofficial-sudo/RendChat/contents/version.json?ref=main';
   static const String _rawManifestUrl =
       'https://raw.githubusercontent.com/rendihomeofficial-sudo/RendChat/main/version.json';
   static const String _releasesApiUrl =
@@ -140,23 +142,43 @@ class AppUpdateService extends ChangeNotifier {
   }
 
   Future<AppUpdateInfo?> _fetchLatestVersionInfo() async {
+    // 1. Coba ambil version.json langsung via GitHub REST API (bebas cache CDN Fastly)
     try {
-      final resp = await http
-          .get(Uri.parse(_rawManifestUrl))
-          .timeout(const Duration(seconds: 15));
+      final resp = await http.get(
+        Uri.parse(_githubContentsRawUrl),
+        headers: {
+          'Accept': 'application/vnd.github.raw',
+          'User-Agent': 'RenChat-App',
+        },
+      ).timeout(const Duration(seconds: 10));
       if (resp.statusCode == 200 && resp.body.isNotEmpty) {
         final data = json.decode(resp.body) as Map<String, dynamic>;
         return AppUpdateInfo.fromJson(data);
       }
     } catch (_) {}
 
+    // 2. Coba ambil dari raw.githubusercontent.com
+    try {
+      final resp = await http
+          .get(Uri.parse(_rawManifestUrl))
+          .timeout(const Duration(seconds: 10));
+      if (resp.statusCode == 200 && resp.body.isNotEmpty) {
+        final data = json.decode(resp.body) as Map<String, dynamic>;
+        return AppUpdateInfo.fromJson(data);
+      }
+    } catch (_) {}
+
+    // 3. Fallback ke GitHub Releases latest endpoint
     try {
       final resp = await http
           .get(
             Uri.parse(_releasesApiUrl),
-            headers: {'Accept': 'application/vnd.github+json'},
+            headers: {
+              'Accept': 'application/vnd.github+json',
+              'User-Agent': 'RenChat-App',
+            },
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 10));
       if (resp.statusCode == 200 && resp.body.isNotEmpty) {
         final data = json.decode(resp.body) as Map<String, dynamic>;
         final tagName = (data['tag_name'] as String? ?? 'v1.0.0').replaceAll('v', '');
