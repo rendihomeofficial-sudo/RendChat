@@ -53,7 +53,11 @@ service cloud.firestore {
                            'lockedBy',
                            'clearedAt',
                            'mutedUntil',
-                           'disappearingDuration'
+                           'disappearingDuration',
+                           'pinnedMessageId',
+                           'pinnedMessageText',
+                           'pinnedMessageSenderName',
+                           'pinnedMessageAt'
                          ]);
       allow delete: if isSignedIn() && (resource.data.createdBy == request.auth.uid || isChatParticipant(chatId));
 
