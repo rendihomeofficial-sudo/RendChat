@@ -1,8 +1,8 @@
 {
-  "version": "1.3.18",
-  "version_code": 31,
-  "title": "RenChat v1.3.18 - Pengiriman Dokumen PDF, Teruskan Pesan & Sematkan Pesan Obrolan",
-  "release_notes": "• Dukungan Pengiriman Dokumen & File PDF: Kirim dan terima berkas PDF, Word, Excel, PowerPoint, TXT, dan Arsip dengan tampilan kartu berwarna adaptif serta ukuran berkas riil di chat.\n• Fitur Teruskan Pesan (Forward Message): Teruskan teks, media, VN, polling, dan dokumen ke kontak atau grup lain dengan indikator 'Diteruskan' khas WhatsApp.\n• Sematkan Pesan di Obrolan (Pin Message): Tempelkan pesan penting di bagian atas obrolan dengan floating banner interaktif dan tombol lepas sematan (unpin) cepat.",
+  "version": "1.3.19",
+  "version_code": 32,
+  "title": "RenChat v1.3.19 - Media Sekali Lihat (View Once) & Pratinjau Rekaman Suara",
+  "release_notes": "• Media Sekali Lihat (View Once / 1x View): Kirim foto dan video privat yang hanya dapat dibuka satu kali oleh penerima dengan lencana '1' khas WhatsApp dan indikator status 'Dibuka'.\n• Jeda & Dengarkan Ulang Voice Note: Kemampuan menjeda perekaman VN, mendengarkan kembali pratinjau suara rekaman sebelum dikirim, serta tombol hapus dan kirim seketika.\n• Pengoptimalan performa pemutar audio, transisi dokumen, dan stabilitas chat.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }

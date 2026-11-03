@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -64,9 +65,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // Real Audio Recorder
+  // Real Audio Recorder & Voice Note Preview System
   late final AudioRecorder _audioRecorder;
+  AudioPlayer? _previewPlayer;
   bool _isRecordingVoice = false;
+  bool _isRecordingPaused = false;
+  bool _isPreviewPlaying = false;
   int _recordDurationSeconds = 0;
   Timer? _recordTimer;
   String? _recordedFilePath;
@@ -152,6 +156,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _clearTypingStatus();
     _recordTimer?.cancel();
     _audioRecorder.dispose();
+    _previewPlayer?.dispose();
     _typingDebounce?.cancel();
     _scrollController.removeListener(_onScrollChanged);
     _textController.dispose();
@@ -171,12 +176,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         );
         setState(() {
           _isRecordingVoice = true;
+          _isRecordingPaused = false;
+          _isPreviewPlaying = false;
           _recordDurationSeconds = 0;
           _recordedFilePath = path;
         });
         _recordTimer?.cancel();
         _recordTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-          if (mounted) {
+          if (mounted && !_isRecordingPaused) {
             setState(() => _recordDurationSeconds++);
           }
         });
@@ -192,17 +199,63 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _pauseRecording() async {
+    try {
+      _recordTimer?.cancel();
+      final path = await _audioRecorder.stop();
+      if (path != null) {
+        _recordedFilePath = path;
+      }
+      setState(() {
+        _isRecordingPaused = true;
+      });
+    } catch (e) {
+      debugPrint('Error pausing recording: $e');
+    }
+  }
+
+  Future<void> _togglePreviewPlayback() async {
+    final path = _recordedFilePath;
+    if (path == null) return;
+
+    _previewPlayer ??= AudioPlayer();
+
+    if (_isPreviewPlaying) {
+      await _previewPlayer?.pause();
+      setState(() => _isPreviewPlaying = false);
+    } else {
+      await _previewPlayer?.play(DeviceFileSource(path));
+      setState(() => _isPreviewPlaying = true);
+
+      _previewPlayer?.onPlayerComplete.listen((_) {
+        if (mounted) {
+          setState(() => _isPreviewPlaying = false);
+        }
+      });
+    }
+  }
+
   Future<void> _stopAndSendRecording() async {
     _recordTimer?.cancel();
+    if (_previewPlayer != null) {
+      await _previewPlayer?.stop();
+    }
+
     try {
-      final path = await _audioRecorder.stop();
+      String? finalPath = _recordedFilePath;
+      if (!_isRecordingPaused) {
+        final path = await _audioRecorder.stop();
+        if (path != null) finalPath = path;
+      }
+
       final sec = _recordDurationSeconds;
       setState(() {
         _isRecordingVoice = false;
+        _isRecordingPaused = false;
+        _isPreviewPlaying = false;
         _recordDurationSeconds = 0;
       });
 
-      final finalPath = path ?? _recordedFilePath;
       if (finalPath == null) return;
 
       final file = File(finalPath);
@@ -256,9 +309,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Future<void> _cancelRecording() async {
     _recordTimer?.cancel();
-    await _audioRecorder.cancel();
+    if (_previewPlayer != null) {
+      await _previewPlayer?.stop();
+    }
+    if (!_isRecordingPaused) {
+      await _audioRecorder.cancel();
+    }
     setState(() {
       _isRecordingVoice = false;
+      _isRecordingPaused = false;
+      _isPreviewPlaying = false;
       _recordDurationSeconds = 0;
     });
   }
@@ -369,9 +429,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
       if (picked == null) return;
 
+      // WhatsApp-Style Media Preview with View-Once (1x) toggle
+      final bool? shouldSendViewOnce = await _showMediaConfirmationDialog(
+        context: context,
+        filePath: picked.path,
+        isVideo: false,
+        title: 'Kirim Foto',
+      );
+      if (shouldSendViewOnce == null) return; // User cancelled
+
       setState(() {
         _isUploading = true;
-        _uploadStatus = 'Uploading photo...';
+        _uploadStatus = 'Mengunggah foto...';
       });
 
       final bytes = await picked.readAsBytes();
@@ -384,7 +453,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
       if (url != null) {
         final reply = _replyingToMessage;
-        final viewOnce = _isViewOnceSelected;
         setState(() {
           _replyingToMessage = null;
           _isViewOnceSelected = false;
@@ -398,7 +466,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           type: MessageType.image,
           mediaUrl: url,
           fileName: picked.name,
-          isViewOnce: viewOnce,
+          isViewOnce: shouldSendViewOnce,
           replyToId: reply?.id,
           replyToSenderName: reply?.senderName,
           replyToText: reply != null ? _getReplyPreviewText(reply) : null,
@@ -521,6 +589,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
       if (picked == null) return;
 
+      // WhatsApp-Style Media Preview with View-Once (1x) toggle
+      final bool? shouldSendViewOnce = await _showMediaConfirmationDialog(
+        context: context,
+        filePath: picked.path,
+        isVideo: true,
+        title: 'Kirim Video',
+      );
+      if (shouldSendViewOnce == null) return; // User cancelled
+
       setState(() {
         _isUploading = true;
         _uploadStatus = 'Mengunggah video...';
@@ -545,11 +622,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           chatId: widget.chat.id,
           senderId: user.uid,
           senderName: user.displayName,
-          text: '📹 Video: ${picked.name}',
+          text: shouldSendViewOnce ? 'Video (Sekali Lihat)' : '📹 Video: ${picked.name}',
           type: MessageType.file,
           mediaUrl: url,
           fileName: picked.name,
           fileSize: size,
+          isViewOnce: shouldSendViewOnce,
           replyToId: reply?.id,
           replyToSenderName: reply?.senderName,
           replyToText: reply != null ? _getReplyPreviewText(reply) : null,
@@ -570,6 +648,169 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         });
       }
     }
+  }
+
+  Future<bool?> _showMediaConfirmationDialog({
+    required BuildContext context,
+    required String filePath,
+    required bool isVideo,
+    required String title,
+  }) async {
+    bool isViewOnce = false;
+
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.black,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setSheetState) {
+            return SafeArea(
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.88,
+                child: Column(
+                  children: [
+                    // Top Appbar with Cancel
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                            onPressed: () => Navigator.pop(ctx, null),
+                          ),
+                          const Spacer(),
+                          Text(
+                            title,
+                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          const Spacer(),
+                          const SizedBox(width: 48), // spacer
+                        ],
+                      ),
+                    ),
+                    // Media preview area
+                    Expanded(
+                      child: Center(
+                        child: isVideo
+                            ? Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(24),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white12,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.videocam_rounded, size: 72, color: WhatsAppTheme.primaryTeal),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                                    child: Text(
+                                      filePath.split(Platform.pathSeparator).last,
+                                      maxLines: 2,
+                                      textAlign: TextAlign.center,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(color: Colors.white70, fontSize: 14),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Image.file(
+                                File(filePath),
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                              ),
+                      ),
+                    ),
+                    // Bottom control bar with WhatsApp View-Once (1x) button & Send button
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                      color: const Color(0xFF111B21),
+                      child: Row(
+                        children: [
+                          // WhatsApp View Once Toggle (1x Circle Button)
+                          InkWell(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setSheetState(() {
+                                isViewOnce = !isViewOnce;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(24),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isViewOnce
+                                    ? WhatsAppTheme.primaryTeal
+                                    : Colors.white.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isViewOnce ? WhatsAppTheme.primaryTeal : Colors.white24,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isViewOnce ? Colors.black : Colors.white,
+                                        width: 1.8,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '1',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                          color: isViewOnce ? Colors.black : Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    isViewOnce ? 'Sekali Lihat Aktif' : 'Sekali Lihat',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: isViewOnce ? Colors.black : Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          // Send button
+                          FloatingActionButton(
+                            heroTag: 'send_media_confirmation',
+                            backgroundColor: WhatsAppTheme.primaryTeal,
+                            elevation: 2,
+                            onPressed: () {
+                              Navigator.pop(ctx, isViewOnce);
+                            },
+                            child: const Icon(Icons.send_rounded, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _pickAndSendAudioFile() async {
@@ -2128,25 +2369,57 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
                 child: _isRecordingVoice
                     ? Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         child: Row(
                           children: [
-                            const Icon(Icons.fiber_manual_record, color: Colors.red, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Recording 0:${_recordDurationSeconds.toString().padLeft(2, '0')}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                            ),
-                            const Spacer(),
+                            // Tombol Hapus (Tong Sampah)
                             IconButton(
-                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-                              tooltip: 'Cancel',
+                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 24),
+                              tooltip: 'Batalkan Rekaman',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                               onPressed: _cancelRecording,
                             ),
+                            const SizedBox(width: 8),
+                            // Indikator Durasi & Status
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _isRecordingPaused ? Icons.pause_circle_filled_rounded : Icons.fiber_manual_record,
+                                  color: _isRecordingPaused ? Colors.amber : Colors.red,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '0:${_recordDurationSeconds.toString().padLeft(2, '0')}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Spacer(),
+                            // Tombol Jeda (Pause) atau Dengarkan Ulang (Preview Play/Pause)
+                            if (!_isRecordingPaused) ...[
+                              IconButton(
+                                icon: const Icon(Icons.pause_circle_outline_rounded, color: Colors.amber, size: 28),
+                                tooltip: 'Jeda & Dengarkan Ulang',
+                                onPressed: _pauseRecording,
+                              ),
+                            ] else ...[
+                              IconButton(
+                                icon: Icon(
+                                  _isPreviewPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+                                  color: WhatsAppTheme.primaryTeal,
+                                  size: 32,
+                                ),
+                                tooltip: _isPreviewPlaying ? 'Jeda Pratinjau' : 'Dengarkan Ulang Rekaman',
+                                onPressed: _togglePreviewPlayback,
+                              ),
+                            ],
                           ],
                         ),
                       )
@@ -2939,7 +3212,7 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                 _buildPollWidget(context),
               ] else if (message.type == MessageType.voice) ...[
                 _buildVoiceNoteWidget(context),
-              ] else if (message.type == MessageType.image && message.isViewOnce) ...[
+              ] else if (message.isViewOnce) ...[
                 _buildViewOnceWidget(context),
               ] else if (message.type == MessageType.image && message.mediaUrl != null) ...[
                 GestureDetector(
@@ -3289,9 +3562,13 @@ class _WhatsAppMessageBubble extends StatelessWidget {
     );
   }
 
-  // View Once Media Widget
+  // View Once Media Widget (Photo / Video 1x)
   Widget _buildViewOnceWidget(BuildContext context) {
     final isOpened = message.isViewedBy(currentUserId);
+    final isVideo = message.fileName != null &&
+        ['mp4', 'mov', 'mkv', 'avi', '3gp'].any((ext) => message.fileName!.toLowerCase().endsWith(ext));
+    final mediaLabel = isVideo ? 'Video' : 'Foto';
+
     return InkWell(
       onTap: () {
         if (!isOpened && message.mediaUrl != null) {
@@ -3300,35 +3577,87 @@ class _WhatsAppMessageBubble extends StatelessWidget {
                 messageId: message.id,
                 userId: currentUserId,
               );
-          _openMediaViewer(context, message.mediaUrl!, 'Photo (View Once)');
+          _openMediaViewer(context, message.mediaUrl!, '$mediaLabel (Sekali Lihat)');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Photo already opened')),
+            SnackBar(content: Text('$mediaLabel sekali lihat sudah pernah dibuka')),
           );
         }
       },
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(8),
+          color: Colors.black.withValues(alpha: 0.25),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isOpened
+                ? Colors.white12
+                : WhatsAppTheme.primaryTeal.withValues(alpha: 0.4),
+            width: 1,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
-              radius: 14,
-              backgroundColor: isOpened ? Colors.grey : WhatsAppTheme.primaryTeal,
-              child: const Text('1', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isOpened
+                    ? Colors.white12
+                    : WhatsAppTheme.primaryTeal.withValues(alpha: 0.18),
+                border: Border.all(
+                  color: isOpened ? Colors.grey : WhatsAppTheme.primaryTeal,
+                  width: 1.6,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  '1',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: isOpened ? Colors.grey : WhatsAppTheme.primaryTeal,
+                  ),
+                ),
+              ),
             ),
             const SizedBox(width: 10),
-            Text(
-              isOpened ? 'Opened' : 'Photo',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: isOpened ? WhatsAppTheme.darkTextSecondary : WhatsAppTheme.darkTextPrimary,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      isVideo ? Icons.videocam_rounded : Icons.photo_camera_rounded,
+                      size: 15,
+                      color: isOpened ? WhatsAppTheme.darkTextSecondary : WhatsAppTheme.primaryTeal,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      isOpened ? '$mediaLabel dibuka' : '$mediaLabel (1x Lihat)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                        color: isOpened ? WhatsAppTheme.darkTextSecondary : Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                if (!isOpened) ...[
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Ketuk untuk melihat',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: WhatsAppTheme.primaryTeal,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),
