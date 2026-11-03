@@ -1,8 +1,8 @@
 {
-  "version": "1.3.20",
-  "version_code": 33,
-  "title": "RenChat v1.3.20 - Navigasi Notifikasi FCM & Peningkatan Keamanan Firestore",
-  "release_notes": "• Navigasi Notifikasi Cepat (Deep-Linking): Mengetuk notifikasi pesan baru saat aplikasi tertutup (cold start) atau di latar belakang kini langsung mengarahkan Anda ke ruang obrolan terkait.\n• Pintasan Pembaruan di Pengaturan: Menu 'Pembaruan aplikasi' kini tampil langsung di halaman utama Pengaturan dengan indikator status dinamis dan pengecekan seketika bebas jeda cache.\n• Pembaruan Aturan Keamanan Firestore: Menyelaraskan izin Firestore untuk penyematan pesan (Pin Message) dan validasi lampiran obrolan.",
+  "version": "1.3.21",
+  "version_code": 34,
+  "title": "RenChat v1.3.21 - Pencarian Teks Pesan Obrolan & Sorotan Kata Kunci",
+  "release_notes": "• Fitur Pencarian Teks Pesan di Ruang Obrolan: Cari kata kunci pesan secara instan langsung melalui tombol pencarian di AppBar obrolan.\n• Sorotan Kata Kunci (Keyword Highlighting): Teks pesan, nama dokumen/berkas, dan keterangan foto yang cocok langsung disorot warna kuning khas WhatsApp.\n• Penghitung Hasil Real-time (Match Counter): Tampilan indikator lencana jumlah pesan yang cocok dan tampilan kosong interaktif jika kata kunci tidak ditemukan.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
