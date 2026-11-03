@@ -24,6 +24,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Background message received: ${message.messageId}');
 }
 
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -58,6 +60,7 @@ class MessengerApp extends StatelessWidget {
       child: Consumer<SettingsService>(
         builder: (context, settings, _) {
           return MaterialApp(
+            navigatorKey: rootNavigatorKey,
             title: 'RenChat',
             debugShowCheckedModeBanner: false,
             theme: WhatsAppTheme.lightTheme,
