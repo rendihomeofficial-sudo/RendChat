@@ -1,8 +1,8 @@
 {
-  "version": "1.3.22",
-  "version_code": 35,
-  "title": "RenChat v1.3.22 - Ikon Logo Resmi RenChat & Pembaruan Branding",
-  "release_notes": "• Logo & Ikon Aplikasi Resmi Baru: Mengganti logo bawaan menjadi logo profesional RenChat bergaya WhatsApp Emerald Badge dengan monogram 'R' dan aksen obrolan modern.\n• Dukungan Penuh Android Adaptive Icon: Ikon aplikasi kini otomatis menyesuaikan bentuk launcher (lingkaran, squircle, teardrop) di Android 8 hingga Android 15 tanpa terpotong.\n• Pengoptimalan resolusi aset ikon launcher hingga kerapatan xxxhdpi (192px) dan master branding 512px.",
+  "version": "1.3.23",
+  "version_code": 36,
+  "title": "RenChat v1.3.23 - Pembenahan Fitur Lengkap & Performa Nyata",
+  "release_notes": "• Pembenahan Pesan Sementara (Disappearing Messages): Pesan kedaluwarsa otomatis disaring dan disembunyikan secara real-time di obrolan dan galeri media.\n• Pembuatan Daftar Siaran (New Broadcast List): Dukungan penuh pembuatan ruang siaran resmi dengan ikon megafon dan format 📢.\n• Pencarian Interaktif Menu Pengaturan: Filter cepat untuk seluruh kategori pengaturan secara real-time.\n• Pengelola Avatar Profil Lengkap: Unggah foto profil langsung dari kamera/galeri dan reset foto profil dengan mudah.\n• Formulir Bantuan Contact Us Cloud Firestore: Pengiriman tiket bantuan teknis tersimpan langsung ke database cloud dengan perlindungan keamanan deklaratif.\n• Verifikasi Dua Langkah Persisten & Tandai Belum Dibaca: Status PIN tersimpan aman di SharedPreferences dan mutasi unread counter aktif.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
