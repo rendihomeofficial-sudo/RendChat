@@ -1,8 +1,8 @@
 {
-  "version": "1.3.23",
-  "version_code": 36,
-  "title": "RenChat v1.3.23 - Pembenahan Fitur Lengkap & Performa Nyata",
-  "release_notes": "• Pembenahan Pesan Sementara (Disappearing Messages): Pesan kedaluwarsa otomatis disaring dan disembunyikan secara real-time di obrolan dan galeri media.\n• Pembuatan Daftar Siaran (New Broadcast List): Dukungan penuh pembuatan ruang siaran resmi dengan ikon megafon dan format 📢.\n• Pencarian Interaktif Menu Pengaturan: Filter cepat untuk seluruh kategori pengaturan secara real-time.\n• Pengelola Avatar Profil Lengkap: Unggah foto profil langsung dari kamera/galeri dan reset foto profil dengan mudah.\n• Formulir Bantuan Contact Us Cloud Firestore: Pengiriman tiket bantuan teknis tersimpan langsung ke database cloud dengan perlindungan keamanan deklaratif.\n• Verifikasi Dua Langkah Persisten & Tandai Belum Dibaca: Status PIN tersimpan aman di SharedPreferences dan mutasi unread counter aktif.",
+  "version": "1.3.24",
+  "version_code": 37,
+  "title": "RenChat v1.3.24 - Desain Barcode Digital ID Card Profesional & Modern",
+  "release_notes": "• Redesain Barcode Akun Digital Profesional: Barcode didesain ulang bergaya ID Card WhatsApp Glassmorphic dengan sudut squircle halus dan organic micro-dots.\n• Watermark Monogram 'R' RenChat: Emblem lingkaran emas dan emerald teal di tengah barcode sebagai identitas resmi akun.\n• Tampilan Murni Barcode: Menghilangkan teks ID mentah agar fokus visual 100% pada pemindaian barcode yang bersih, elegan, dan instan.\n• Pembaruan Komponen QR: Diterapkan menyeluruh pada menu Barcode Akun Saya di Pengaturan dan Kontak.",
   "apk_url": "https://github.com/rendihomeofficial-sudo/RendChat/releases/latest/download/RenChat.apk",
   "fallback_url": "https://github.com/rendihomeofficial-sudo/RendChat"
 }
