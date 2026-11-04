@@ -102,6 +102,13 @@ service cloud.firestore {
                     && (request.auth.uid == resource.data.callerId || request.auth.uid == resource.data.receiverId);
     }
 
+    match /support_tickets/{ticketId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.createdAt is timestamp;
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid);
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

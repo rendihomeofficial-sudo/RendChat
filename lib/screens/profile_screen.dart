@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -25,6 +26,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _picker = ImagePicker();
   bool _isSaving = false;
 
+  // Bilah pencarian interaktif Settings
+  bool _isSearchingSettings = false;
+  String _settingsSearchQuery = '';
+  final TextEditingController _settingsSearchController = TextEditingController();
+
   String _lastSeenPrivacy = 'Everyone';
   String _profilePhotoPrivacy = 'My contacts';
   String _aboutPrivacy = 'Everyone';
@@ -42,6 +48,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _aboutPrivacy = settings.aboutPrivacy;
     _appLanguage = settings.appLanguage;
   }
+  @override
+  void dispose() {
+    _settingsSearchController.dispose();
+    super.dispose();
+  }
+
   String _notificationTone = 'RenChat Ding (Default)';
   String _vibrateSetting = 'Default';
   String _lightSetting = 'White';
@@ -1729,42 +1741,117 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showContactSupportDialog() {
     final issueCtrl = TextEditingController();
+    bool isSubmitting = false;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppTheme.darkSurface,
-        title: const Text('Contact us'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Describe your issue. Technical details and app logs will automatically be sent to our support team.',
-              style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: issueCtrl,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: 'Briefly explain what happened...',
-                border: OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: WhatsAppTheme.darkSurface,
+          title: const Text('Contact us'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Describe your issue. Technical details and app logs will automatically be sent to our support team.',
+                style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary),
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: issueCtrl,
+                maxLines: 4,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(
+                  hintText: 'Briefly explain what happened...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              if (isSubmitting) ...[
+                const SizedBox(height: 16),
+                const Row(
+                  children: [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(WhatsAppTheme.primaryTeal),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Mengirim tiket bantuan...',
+                      style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      final text = issueCtrl.text.trim();
+                      if (text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Silakan jelaskan kendala yang dialami.')),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isSubmitting = true);
+
+                      try {
+                        final auth = context.read<AuthService>();
+                        final user = auth.appUser;
+                        final uid = auth.currentUid ?? 'anonymous';
+
+                        // Simpan tiket bantuan nyata ke Cloud Firestore
+                        await FirebaseFirestore.instance.collection('support_tickets').add({
+                          'userId': uid,
+                          'userEmail': user?.email ?? '',
+                          'userName': user?.displayName ?? 'Pengguna RenChat',
+                          'issue': text,
+                          'status': 'open',
+                          'createdAt': FieldValue.serverTimestamp(),
+                          'appVersion': '1.3.22',
+                          'platform': Platform.operatingSystem,
+                        });
+
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                        }
+
+                        if (mounted) {
+                          showPremiumNotificationToast(
+                            context,
+                            title: 'Tiket Bantuan Terkirim',
+                            message: 'Laporan Anda telah diterima tim RenChat via Cloud Firestore.',
+                            icon: Icons.check_circle_rounded,
+                            accentColor: WhatsAppTheme.primaryTeal,
+                          );
+                        }
+                      } catch (e) {
+                        setDialogState(() => isSubmitting = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Gagal mengirim tiket: $e')),
+                          );
+                        }
+                      }
+                    },
+              child: const Text('Send'),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Support ticket created. We will reply via email!')),
-              );
-            },
-            child: const Text('Send'),
-          ),
-        ],
       ),
     );
   }
@@ -1850,20 +1937,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: WhatsAppTheme.darkBg,
       appBar: AppBar(
-        title: const Text('Settings'),
+        leading: _isSearchingSettings
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: () {
+                  setState(() {
+                    _isSearchingSettings = false;
+                    _settingsSearchQuery = '';
+                    _settingsSearchController.clear();
+                  });
+                },
+              )
+            : null,
+        title: _isSearchingSettings
+            ? TextField(
+                controller: _settingsSearchController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+                decoration: const InputDecoration(
+                  hintText: 'Cari pengaturan...',
+                  hintStyle: TextStyle(color: WhatsAppTheme.darkTextSecondary),
+                  border: InputBorder.none,
+                ),
+                onChanged: (val) {
+                  setState(() {
+                    _settingsSearchQuery = val.trim().toLowerCase();
+                  });
+                },
+              )
+            : const Text('Settings'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search_rounded),
-            tooltip: 'Search settings',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Search settings: type to filter options')),
-              );
-            },
-          ),
+          if (_isSearchingSettings)
+            IconButton(
+              icon: const Icon(Icons.close_rounded),
+              tooltip: 'Hapus pencarian',
+              onPressed: () {
+                setState(() {
+                  _settingsSearchQuery = '';
+                  _settingsSearchController.clear();
+                });
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.search_rounded),
+              tooltip: 'Search settings',
+              onPressed: () {
+                setState(() {
+                  _isSearchingSettings = true;
+                });
+              },
+            ),
         ],
       ),
-      body: ListView(
+      body: _buildSettingsContent(user),
+    );
+  }
+
+  Widget _buildSettingsContent(AppUser user) {
+    if (_isSearchingSettings && _settingsSearchQuery.isNotEmpty) {
+      return _buildSearchResults();
+    }
+
+    return ListView(
         children: [
           // WhatsApp Profile Header Card
           InkWell(
@@ -2079,6 +2215,122 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildSearchResults() {
+    final query = _settingsSearchQuery;
+    final allItems = [
+      {
+        'title': 'Account',
+        'subtitle': 'Security notifications, two-step verification, change number',
+        'icon': Icons.key_rounded,
+        'action': _showAccountSettings,
+      },
+      {
+        'title': 'Privacy',
+        'subtitle': 'Last seen and online, profile photo, about, read receipts, disappearing messages',
+        'icon': Icons.lock_outline_rounded,
+        'action': _showPrivacySettings,
+      },
+      {
+        'title': 'Avatar',
+        'subtitle': 'Create personalized avatar, edit avatar, set as profile photo',
+        'icon': Icons.face_rounded,
+        'action': _showAvatarDialog,
+      },
+      {
+        'title': 'Chats',
+        'subtitle': 'Theme, wallpaper, chat backup, chat history',
+        'icon': Icons.chat_bubble_outline_rounded,
+        'action': _showChatsSettings,
+      },
+      {
+        'title': 'Notifications',
+        'subtitle': 'Notification tone, vibrate, popup notification, light, high priority',
+        'icon': Icons.notifications_none_rounded,
+        'action': _showNotificationsSettings,
+      },
+      {
+        'title': 'Storage and data',
+        'subtitle': 'Network usage, auto-download, manage storage, clear cache',
+        'icon': Icons.data_usage_rounded,
+        'action': _showStorageSettings,
+      },
+      {
+        'title': 'App language',
+        'subtitle': 'Indonesian, English, and other regional languages',
+        'icon': Icons.language_rounded,
+        'action': _showAppLanguageDialog,
+      },
+      {
+        'title': 'Pembaruan aplikasi',
+        'subtitle': 'Periksa update versi terbaru RenChat dari GitHub Releases',
+        'icon': Icons.system_update_rounded,
+        'action': () => showUpdateDialog(context),
+      },
+      {
+        'title': 'Help & Support',
+        'subtitle': 'Help centre, contact us, terms and privacy policy, app info',
+        'icon': Icons.help_outline_rounded,
+        'action': _showHelpSettings,
+      },
+      {
+        'title': 'Undang Teman',
+        'subtitle': 'Barcode QR code, bagikan ID unik akun RenChat',
+        'icon': Icons.qr_code_2_rounded,
+        'action': () {
+          final auth = context.read<AuthService>();
+          final user = auth.appUser;
+          if (user != null) _showQrCodeDialog(user);
+        },
+      },
+    ];
+
+    final filtered = allItems.where((item) {
+      final t = (item['title'] as String).toLowerCase();
+      final s = (item['subtitle'] as String).toLowerCase();
+      return t.contains(query) || s.contains(query);
+    }).toList();
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.search_off_rounded, size: 48, color: WhatsAppTheme.darkTextSecondary),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Tidak ada opsi pengaturan untuk "$query"',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: filtered.length,
+      itemBuilder: (ctx, idx) {
+        final item = filtered[idx];
+        return _settingsTile(
+          icon: item['icon'] as IconData,
+          title: item['title'] as String,
+          subtitle: item['subtitle'] as String,
+          onTap: item['action'] as VoidCallback,
+        );
+      },
+    );
+  }
+
   Widget _settingsTile({
     required IconData icon,
     required String title,
@@ -2102,41 +2354,100 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showAvatarDialog() {
+    final auth = context.read<AuthService>();
+    final user = auth.appUser;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: WhatsAppTheme.darkSurface,
-        title: const Text('RenChat Avatar'),
+        title: const Text('RenChat Avatar & Foto Profil'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircleAvatar(
-              radius: 40,
-              backgroundColor: WhatsAppTheme.attachGallery,
-              child: Icon(Icons.face_rounded, size: 50, color: Colors.white),
+            Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                UserAvatar(
+                  name: user?.displayName ?? 'User',
+                  photoUrl: user?.photoURL,
+                  radius: 46,
+                ),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: WhatsAppTheme.primaryTeal,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.black),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             const Text(
-              'Express yourself with personalized avatars on RenChat chats and stickers.',
+              'Ekspresikan diri Anda dengan foto profil langsung dari kamera atau galeri perangkat Anda.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: WhatsAppTheme.darkTextSecondary),
             ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
-              icon: const Icon(Icons.edit_rounded),
-              label: const Text('Create your Avatar'),
-              onPressed: () {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Avatar editor opened! Customize your 3D look.')),
-                );
-              },
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                    label: const Text('Kamera'),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _processAvatarPick(ImageSource.camera);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
+                    icon: const Icon(Icons.photo_library_rounded, size: 18),
+                    label: const Text('Galeri'),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _processAvatarPick(ImageSource.gallery);
+                    },
+                  ),
+                ),
+              ],
             ),
+            if (user?.photoURL != null && user!.photoURL!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              TextButton.icon(
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                label: const Text('Hapus Foto Profil', style: TextStyle(color: Colors.redAccent)),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await auth.updateProfile(photoURL: '');
+                    if (mounted) {
+                      showPremiumNotificationToast(
+                        context,
+                        title: 'Foto Profil Dihapus',
+                        message: 'Avatar profil Anda telah direset ke inisial nama.',
+                        icon: Icons.check_circle_rounded,
+                        accentColor: WhatsAppTheme.primaryTeal,
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Gagal menghapus foto profil: $e')),
+                      );
+                    }
+                  }
+                },
+              ),
+            ],
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
         ],
       ),
     );
