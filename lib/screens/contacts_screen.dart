@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../theme/whatsapp_theme.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/professional_qr_card.dart';
 import 'camera_qr_scanner_screen.dart';
 import 'chat_screen.dart';
 
@@ -131,98 +132,35 @@ class _ContactsScreenState extends State<ContactsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppTheme.darkSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Row(
-          children: [
-            Icon(Icons.qr_code_2_rounded, color: WhatsAppTheme.primaryTeal),
-            SizedBox(width: 8),
-            Text('Barcode Akun Saya', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          ],
-        ),
+        backgroundColor: Colors.transparent,
+        contentPadding: EdgeInsets.zero,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            UserAvatar(
-              name: user.displayName,
+            ProfessionalQrCard(
+              uid: user.uid,
+              displayName: user.displayName,
               photoUrl: user.photoURL,
-              radius: 34,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              user.displayName,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
-            ),
-            const Text(
-              'Pindai barcode ini atau salin ID Pengguna di bawah untuk mengobrol instan.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: WhatsAppTheme.darkTextSecondary),
+              subtitle: 'Arahkan kamera pemindai ke barcode ini untuk mengobrol instan.',
             ),
             const SizedBox(height: 16),
-            // Custom Artistic QR Code Grid
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: const [
-                  BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
-                ],
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: WhatsAppTheme.darkSurface,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: const BorderSide(color: Colors.white12),
+                ),
               ),
-              child: CustomPaint(
-                size: const Size(180, 180),
-                painter: _CustomQrPainter(user.uid),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF101B20),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: WhatsAppTheme.primaryTeal.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.badge_rounded, color: WhatsAppTheme.primaryTeal, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'ID: ${user.uid}',
-                      style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.copy_rounded, size: 18, color: WhatsAppTheme.primaryTeal),
-                    tooltip: 'Salin ID Pengguna',
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: user.uid));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('ID Akun RenChat disalin ke papan klip!')),
-                      );
-                    },
-                  ),
-                ],
-              ),
+              icon: const Icon(Icons.close_rounded, size: 18),
+              label: const Text('Tutup'),
+              onPressed: () => Navigator.pop(ctx),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup', style: TextStyle(color: WhatsAppTheme.darkTextSecondary))),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
-            icon: const Icon(Icons.copy_rounded, size: 16),
-            label: const Text('Salin ID'),
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: user.uid));
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('ID Akun RenChat disalin ke papan klip!')),
-              );
-            },
-          ),
-        ],
       ),
     );
   }
@@ -368,65 +306,4 @@ class _ContactsScreenState extends State<ContactsScreen> {
       ),
     );
   }
-}
-
-// Custom QR Visual Matrix Painter
-class _CustomQrPainter extends CustomPainter {
-  final String seed;
-  _CustomQrPainter(this.seed);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paintDark = Paint()..color = const Color(0xFF111B21);
-    final paintTeal = Paint()..color = const Color(0xFF00A884);
-
-    const int grid = 15;
-    final cellWidth = size.width / grid;
-    final cellHeight = size.height / grid;
-
-    final hash = seed.hashCode.abs();
-
-    for (int r = 0; r < grid; r++) {
-      for (int c = 0; c < grid; c++) {
-        // Corners QR positioning markers
-        final isTopLeft = r < 4 && c < 4;
-        final isTopRight = r < 4 && c >= grid - 4;
-        final isBottomLeft = r >= grid - 4 && c < 4;
-
-        if (isTopLeft || isTopRight || isBottomLeft) {
-          final isBorder = (r == 0 || r == 3 || c == 0 || c == 3) ||
-              (r == 0 || r == 3 || c == grid - 4 || c == grid - 1) ||
-              (r == grid - 4 || r == grid - 1 || c == 0 || c == 3);
-          final isCenter = (r >= 1 && r <= 2 && c >= 1 && c <= 2) ||
-              (r >= 1 && r <= 2 && c >= grid - 3 && c <= grid - 2) ||
-              (r >= grid - 3 && r <= grid - 2 && c >= 1 && c <= 2);
-
-          if (isBorder || isCenter) {
-            canvas.drawRRect(
-              RRect.fromRectAndRadius(
-                Rect.fromLTWH(c * cellWidth, r * cellHeight, cellWidth - 1, cellHeight - 1),
-                const Radius.circular(2),
-              ),
-              paintDark,
-            );
-          }
-        } else {
-          // Pseudorandom internal QR dots based on user seed hash
-          final val = (hash ^ (r * 31 + c * 17)) % 7;
-          if (val < 3) {
-            canvas.drawRRect(
-              RRect.fromRectAndRadius(
-                Rect.fromLTWH(c * cellWidth, r * cellHeight, cellWidth - 1.2, cellHeight - 1.2),
-                const Radius.circular(1.5),
-              ),
-              val == 0 ? paintTeal : paintDark,
-            );
-          }
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
