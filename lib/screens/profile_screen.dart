@@ -47,6 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _profilePhotoPrivacy = settings.profilePhotoPrivacy;
     _aboutPrivacy = settings.aboutPrivacy;
     _appLanguage = settings.appLanguage;
+    _twoStepEnabled = settings.isTwoStepEnabled;
   }
   @override
   void dispose() {
@@ -409,12 +410,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: WhatsAppTheme.primaryTeal),
-            onPressed: () {
+            onPressed: () async {
+              final pin = pinCtrl.text.trim();
+              if (pin.length < 6) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('PIN harus 6 digit angka.')),
+                );
+                return;
+              }
               Navigator.pop(ctx);
               setState(() => _twoStepEnabled = true);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Two-step verification has been turned on!')),
-              );
+              await context.read<SettingsService>().setTwoStepPin(pin);
+              if (mounted) {
+                showPremiumNotificationToast(
+                  context,
+                  title: 'Verifikasi Dua Langkah Aktif',
+                  message: 'PIN 6-digit Anda berhasil disimpan dan melindungi akun Anda.',
+                  icon: Icons.security_rounded,
+                  accentColor: WhatsAppTheme.primaryTeal,
+                );
+              }
             },
             child: const Text('Enable'),
           ),

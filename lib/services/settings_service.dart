@@ -19,6 +19,7 @@ class SettingsService extends ChangeNotifier {
   static const String _customWallpaperPathKey = 'settings_custom_wallpaper_path';
   static const String _lastBackupKey = 'settings_last_backup_time';
   static const String _appLanguageKey = 'settings_app_language';
+  static const String _twoStepPinKey = 'settings_two_step_pin';
   static const String _netSentBytesKey = 'settings_net_sent_bytes';
   static const String _netRecvBytesKey = 'settings_net_recv_bytes';
 
@@ -32,6 +33,7 @@ class SettingsService extends ChangeNotifier {
   String? _customWallpaperPath;
   String _lastBackupTime = 'Belum pernah';
   String _appLanguage = 'Indonesian';
+  String? _twoStepPin;
   int _netSentBytes = 0;
   int _netRecvBytes = 0;
 
@@ -45,6 +47,8 @@ class SettingsService extends ChangeNotifier {
   String? get customWallpaperPath => _customWallpaperPath;
   String get lastBackupTime => _lastBackupTime;
   String get appLanguage => _appLanguage;
+  bool get isTwoStepEnabled => _twoStepPin != null && _twoStepPin!.isNotEmpty;
+  String? get twoStepPin => _twoStepPin;
   int get netSentBytes => _netSentBytes;
   int get netRecvBytes => _netRecvBytes;
 
@@ -97,6 +101,8 @@ class SettingsService extends ChangeNotifier {
 
       final lang = prefs.getString(_appLanguageKey);
       if (lang != null) _appLanguage = lang;
+
+      _twoStepPin = prefs.getString(_twoStepPinKey);
 
       _netSentBytes = prefs.getInt(_netSentBytesKey) ?? 0;
       _netRecvBytes = prefs.getInt(_netRecvBytesKey) ?? 0;
@@ -183,6 +189,17 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_appLanguageKey, val);
+  }
+
+  Future<void> setTwoStepPin(String? pin) async {
+    _twoStepPin = pin;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    if (pin != null && pin.isNotEmpty) {
+      await prefs.setString(_twoStepPinKey, pin);
+    } else {
+      await prefs.remove(_twoStepPinKey);
+    }
   }
 
   Future<void> performRealBackup() async {

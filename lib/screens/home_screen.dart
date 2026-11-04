@@ -1882,11 +1882,14 @@ class _WhatsAppChatTile extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.mark_chat_unread_outlined),
                 title: const Text('Tandai belum dibaca'),
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Ditandai belum dibaca')),
-                  );
+                  await chatService.markChatAsUnread(chat.id, currentUserId);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Ditandai belum dibaca')),
+                    );
+                  }
                 },
               ),
               // Opsi Hapus Komunitas / Grup Obrolan

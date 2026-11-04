@@ -298,6 +298,21 @@ class ChatService {
     }
   }
 
+  // Tandai obrolan belum dibaca (set unread counter minimal 1)
+  Future<void> markChatAsUnread(String chatId, String currentUserId) async {
+    try {
+      final chatDoc = await _chatsRef.doc(chatId).get();
+      if (!chatDoc.exists) return;
+      final chat = chatDoc.data()!;
+
+      final newUnread = Map<String, int>.from(chat.unread);
+      newUnread[currentUserId] = (newUnread[currentUserId] ?? 0) > 0 ? newUnread[currentUserId]! : 1;
+      await _chatsRef.doc(chatId).update({'unread': newUnread});
+    } catch (e) {
+      debugPrint('Error marking chat as unread: $e');
+    }
+  }
+
   // Add / toggle reaction on message
   Future<void> toggleReaction({
     required String chatId,
