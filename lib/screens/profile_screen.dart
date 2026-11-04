@@ -1837,7 +1837,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           'issue': text,
                           'status': 'open',
                           'createdAt': FieldValue.serverTimestamp(),
-                          'appVersion': '1.3.22',
+                          'appVersion': '1.3.23',
                           'platform': Platform.operatingSystem,
                         });
 
