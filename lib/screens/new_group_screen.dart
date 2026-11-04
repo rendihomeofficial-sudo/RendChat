@@ -7,7 +7,8 @@ import '../widgets/user_avatar.dart';
 import 'chat_screen.dart';
 
 class NewGroupScreen extends StatefulWidget {
-  const NewGroupScreen({super.key});
+  final bool isBroadcast;
+  const NewGroupScreen({super.key, this.isBroadcast = false});
 
   @override
   State<NewGroupScreen> createState() => _NewGroupScreenState();
@@ -49,14 +50,14 @@ class _NewGroupScreenState extends State<NewGroupScreen> {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a group subject')),
+        SnackBar(content: Text(widget.isBroadcast ? 'Please enter a broadcast list name' : 'Please enter a group subject')),
       );
       return;
     }
 
     if (_selectedUids.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least 1 member')),
+        SnackBar(content: Text(widget.isBroadcast ? 'Please select at least 2 recipients' : 'Please select at least 1 member')),
       );
       return;
     }
@@ -71,7 +72,7 @@ class _NewGroupScreenState extends State<NewGroupScreen> {
 
     try {
       final chat = await chatService.createGroupChat(
-        title: title,
+        title: widget.isBroadcast ? '📢 $title' : title,
         creator: currentUser,
         members: selectedMembers,
       );
@@ -96,7 +97,7 @@ class _NewGroupScreenState extends State<NewGroupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New Group'),
+        title: Text(widget.isBroadcast ? 'New Broadcast List' : 'New Group'),
         actions: [
           TextButton(
             onPressed: _isCreating ? null : _createGroup,
@@ -116,11 +117,11 @@ class _NewGroupScreenState extends State<NewGroupScreen> {
             padding: const EdgeInsets.all(16.0),
             child: TextField(
               controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Group Subject',
-                hintText: 'Enter group name...',
-                prefixIcon: Icon(Icons.group),
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: widget.isBroadcast ? 'Broadcast List Name' : 'Group Subject',
+                hintText: widget.isBroadcast ? 'Enter broadcast name...' : 'Enter group name...',
+                prefixIcon: Icon(widget.isBroadcast ? Icons.campaign_rounded : Icons.group),
+                border: const OutlineInputBorder(),
               ),
             ),
           ),

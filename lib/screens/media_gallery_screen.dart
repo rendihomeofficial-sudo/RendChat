@@ -52,6 +52,15 @@ class MediaGalleryScreen extends StatelessWidget {
                 }
 
                 var messages = snapshot.data ?? [];
+                final disappearingSec = chatSnap.data?.disappearingDuration;
+                if (disappearingSec != null && disappearingSec > 0) {
+                  final now = DateTime.now();
+                  messages = messages.where((m) {
+                    final expiryDate = m.createdAt.add(Duration(seconds: disappearingSec));
+                    return expiryDate.isAfter(now);
+                  }).toList();
+                }
+
                 if (clearedTime != null) {
                   messages = messages.where((m) => m.createdAt.isAfter(clearedTime)).toList();
                 }

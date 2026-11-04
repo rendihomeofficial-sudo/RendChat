@@ -505,7 +505,7 @@ class _HomeScreenState extends State<HomeScreen> {
             } else if (value == 'new_broadcast') {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const ContactsScreen()),
+                MaterialPageRoute(builder: (_) => const NewGroupScreen(isBroadcast: true)),
               );
             } else if (value == 'linked_devices') {
               _showLinkedDevicesDialog(context);

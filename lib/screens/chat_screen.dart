@@ -1940,6 +1940,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       }
 
                       var allMessages = snapshot.data ?? [];
+                      final now = DateTime.now();
+
+                      // Saring pesan sementara (disappearing messages) jika masa aktif pesan telah lewat
+                      final disappearingSec = currentChat.disappearingDuration;
+                      if (disappearingSec != null && disappearingSec > 0) {
+                        allMessages = allMessages.where((m) {
+                          final expiryDate = m.createdAt.add(Duration(seconds: disappearingSec));
+                          return expiryDate.isAfter(now);
+                        }).toList();
+                      }
+
                       // Saring pesan berdasarkan waktu clearedAt milik pengguna (model WhatsApp)
                       if (clearedTime != null) {
                         allMessages = allMessages
